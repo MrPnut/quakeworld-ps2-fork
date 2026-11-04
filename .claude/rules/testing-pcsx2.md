@@ -180,8 +180,8 @@ The rest are scripted runs:
   `mass0:` 661 ms in (600 ms of it waiting for the drive), loaded e1m1 and took a screenshot. On
   2026-11-01, with the boot resetting the IOP every time (`IOP boot: resetting the IOP: every
   console boot does`, 68 ms under PCSX2), the data was on `mass0:` at 746 ms, the pkz packs loaded
-  from it, the attract demos streamed through the loader and the game's audsrv greeted at
-  priority 39. Put
+  from it, the attract demos streamed through the loader and the game's copy of audsrv (since
+  replaced by the SDK's) greeted at priority 39. Put
   `ps2_logfile 1` in the image's `autoexec.cfg`, and read what the run left with `hdiutil attach
   -readonly -nobrowse -mountpoint <dir> -imagekey diskimage-class=CRawDiskImage <image>`, then
   `hdiutil detach <dir>`. Edit the ini only with PCSX2 closed, and restore it after.

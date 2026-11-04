@@ -13,9 +13,9 @@ namespace ps2::audio {
 
 // The ReadCycles() the feeder spent inside audsrv's two RPCs since the last call, then starts
 // over: the free-space query (audsrv_available) and the plays (audsrv_play_audio). Either waits on
-// the IOP while a file read is out there (audio.md): ps2sdk's audsrv answered at fileXio's
-// priority, and from the HDD a query waited up to 65 ms behind a read, most of the ring. The
-// game's audsrv answers one priority above, and these show whether it still does.
+// the IOP while a file read is out there (audio.md): audsrv answered at fileXio's priority by
+// default, and from the HDD a query waited up to 65 ms behind a read, most of the ring. Started
+// with thpri=39 it answers one priority above, and these show whether it still does.
 void TakeFeederRpcCycles(u32 & queryCycles, u32 & playCycles);
 
 } // namespace ps2::audio

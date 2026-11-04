@@ -25,12 +25,13 @@ The README's "Sound" section has the design. The facts behind it:
   40 (`rpc_server.c`), fileXio's priority, and the IOP has no time slicing, so a request waits out
   any read in progress (a HDD read keeps fileXio's thread running: dev9's DMA spin). On the Quake II
   port's console from the HDD the free-space query waited up to 65 ms behind a loader read, most of
-  the ring, heard as a stutter at the railgun pickup; from USB never. **Since 2026-11-01 the game
-  builds its own audsrv** (`src/ps2/iop/audsrv`, the SDK's at `329e2bb` plus a `rpc_prio=`
-  argument, every change tagged `[PS2_QUAKE]`) and `iop_boot.cpp` starts it at 39, the play
-  thread's priority: on that console the slowest free-space call went 65.4 → 0.53-0.64 ms. The
-  module's greeting says which build runs: `greetings from version 0.93 (rpc thread priority 39)`
-  in the IOP console. Here the feeder makes those calls, so a wait holds the feeder, not a frame,
+  the ring, heard as a stutter at the railgun pickup; from USB never. **`iop_boot.cpp` starts
+  audsrv with `thpri=39`**, the play thread's priority: on that console the slowest free-space
+  call went 65.4 → 0.53-0.64 ms. The argument went into ps2sdk as PR #952 (in `d41ea62`, CI's pin
+  since 2026-11-04); from 2026-11-01 until then the game built its own copy of audsrv with a
+  `rpc_prio=` argument. An audsrv older than `d41ea62` ignores `thpri=` and stays at 40, and the
+  SDK's prints no priority; it reports a bad value as `audsrv: ignoring invalid argument`. Here
+  the feeder makes those calls, so a wait holds the feeder, not a frame,
   but a wait past its 43 ms queue depth still empties the ring; the frame log's `sndQuery` and
   `sndPlay` columns (`audio/snd.h`, profile builds) are the feeder's time inside each RPC per
   frame, to see it on a console.
