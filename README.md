@@ -352,6 +352,10 @@ those directly on the PS2's hardware, with no GL underneath.
 [input.cpp](src/ps2/input/input.cpp) drives the DualShock 2 ([pad.cpp](src/ps2/input/pad.cpp), held in
 analog mode) and an optional USB keyboard ([keyboard.cpp](src/ps2/input/keyboard.cpp)).
 
+**Both controller ports are watched** (slot 0 of each; no multitap). While no pad is in use the
+first port in connector order that has one is taken, so with two pads attached connector 1's plays.
+The chosen pad keeps it until it is unplugged, and then both ports are watched again.
+
 **The pad** works as QuakeSpasm's game controller: each button is a key the menus understand (Cross
 is Enter, Circle is Back) and binds like any other (`bind RTRIGGER +attack`). The defaults:
 
