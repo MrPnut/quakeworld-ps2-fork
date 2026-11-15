@@ -385,6 +385,8 @@ The Options rows QuakeSpasm gives the mouse work the look stick instead:
   mouse does without mouse look, and the view levels itself as in classic Quake. It is on by
   default, and `config.cfg` keeps a `-mlook` when it is turned off.
 - **Lookspring** recentres the view as the player runs after looking up or down.
+- **Swap Sticks** is `joy_swapmovelook`: the right stick moves and the left one looks. The `joy_*`
+  cvars follow the job, not the stick: `joy_deadzone_look` is the look stick's either way.
 
 Lookstrafe is gone: it had the mouse strafe instead of turn, and a look stick that strafed would
 leave nothing to turn with. The yes/no questions ("start a new game?") take Cross for yes and

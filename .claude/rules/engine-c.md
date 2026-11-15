@@ -191,7 +191,8 @@ Look (`joy_invert`), `OPT_ALWAYSMLOOK` Stick Look (QuakeSpasm's own `+mlook` tog
 lets the look stick look up and down only under it, and without it the stick only turns and
 leaves the pitch drifting, as in_sdl.c's `IN_MouseMove` treats the mouse), `OPT_MUSICEXT`
 Background Music. `OPT_LOOKSTRAFE` is commented out (the mouse strafing instead of turning; a look
-stick that did would leave nothing to turn with), and `OPT_PS2RUMBLE` steps `in_rumble`.
+stick that did would leave nothing to turn with), `OPT_PS2SWAPSTICKS` Swap Sticks steps QuakeSpasm's
+`joy_swapmovelook`, and `OPT_PS2RUMBLE` steps `in_rumble`.
 `PS2_DefaultConfig` adds `+mlook`, as QuakeSpasm's own default.cfg does, so `host.c`'s
 `Host_WriteConfiguration` writes `-mlook` when it is off: with only QuakeSpasm's `+mlook` line,
 the defaults would turn it back on at every boot.

@@ -584,7 +584,8 @@ void IN_SendKeyEvents()
 // ------------------------------------------------------------------------------------------------
 
 // The sticks' share of the frame's move: in_sdl.c's IN_JoyMove. The left stick walks and strafes,
-// the right one turns and looks (joy_swapmovelook swaps them), straight into cl.viewangles.
+// the right one turns and looks (joy_swapmovelook, the options menu's Swap Sticks, trades them),
+// straight into cl.viewangles. The joy_* cvars follow the job, not the stick.
 //
 // The look stick looks up and down only while +mlook holds, the options menu's Stick Look: with
 // no mouse, mouse look is the stick's. Without it the stick turns and nothing more, as Quake's

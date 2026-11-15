@@ -1031,6 +1031,7 @@ enum
 //#ifdef _WIN32
 //	OPT_USEMOUSE,
 //#endif
+	OPT_PS2SWAPSTICKS, // [PS2_QUAKE]: move with the right stick and look with the left, joy_swapmovelook
 	OPT_PS2RUMBLE, // [PS2_QUAKE]: the pad's vibration, in_rumble
 	OPT_PS2SAVEDEVICE, // [PS2_QUAKE]: where saves go, host files or the memory card
 	OPT_PS2DEBUG, // [PS2_QUAKE]: the backend's debugging aids, on the gamepad
@@ -1172,6 +1173,10 @@ void M_AdjustSliders (int dir)
 	//	Cvar_Set ("lookstrafe", lookstrafe.value ? "0" : "1");
 	//	break;
 
+	case OPT_PS2SWAPSTICKS: // [PS2_QUAKE]
+		Cvar_SetValue ("joy_swapmovelook", !Cvar_VariableValue ("joy_swapmovelook"));
+		break;
+
 	case OPT_PS2RUMBLE: // [PS2_QUAKE]
 		Cvar_SetValue ("in_rumble", !Cvar_VariableValue ("in_rumble"));
 		break;
@@ -1299,6 +1304,10 @@ void M_Options_Draw (void)
 	// OPT_LOOKSTRAFE: [PS2_QUAKE]: no row (see the enum)
 	//M_Print (16, 32 + 8*OPT_LOOKSTRAFE,	"            Lookstrafe");
 	//M_DrawCheckbox (220, 32 + 8*OPT_LOOKSTRAFE, lookstrafe.value);
+
+	// OPT_PS2SWAPSTICKS: [PS2_QUAKE]
+	M_Print (16, 32 + 8*OPT_PS2SWAPSTICKS,	"           Swap Sticks");
+	M_DrawCheckbox (220, 32 + 8*OPT_PS2SWAPSTICKS, Cvar_VariableValue ("joy_swapmovelook") != 0);
 
 	// OPT_PS2RUMBLE: [PS2_QUAKE]
 	M_Print (16, 32 + 8*OPT_PS2RUMBLE,	"                Rumble");
