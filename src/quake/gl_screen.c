@@ -656,7 +656,9 @@ void SCR_DrawCrosshair (void)
 		return;
 
 	GL_SetCanvas (CANVAS_CROSSHAIR);
-	Draw_Character (-4, -4, '+'); //0,0 is center of viewport
+	// [PS2_QUAKE]: Quake II's crosshairs, which the backend draws (draw.cpp), for the '+' glyph
+	// QuakeSpasm drew here: Draw_Character (-4, -4, '+'); //0,0 is center of viewport
+	PS2_DrawCrosshair ((int)crosshair.value);
 }
 
 

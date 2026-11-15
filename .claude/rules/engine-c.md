@@ -174,6 +174,11 @@ stays last as its hiding logic needs, and hands the page its frames and keys in 
 `M_Keydown`. Options' own "Goto console" row (`OPT_CONSOLE`) is gone: the debug page's "Open
 console" row does it.
 
+For the crosshair (`engine_hooks.h`, `ps2/renderer/draw.cpp`): `gl_screen.c`'s `SCR_DrawCrosshair`
+calls `PS2_DrawCrosshair` with the `crosshair` cvar where it drew the `'+'` glyph, in the same
+canvas (`CANVAS_CROSSHAIR`, scaled by `scr_crosshairscale`): Quake II's three shapes, 1 to 3. The
+Video Options page has the rows for both (vid.cpp declares `crosshair`, which no header does).
+
 For the main menu (`engine_hooks.h`, `ps2/menu/about_menu.cpp`): `M_Main_Draw` draws
 `gfx/mainmenu.lmp` a 20-row item at a time with `PS2_DrawPicRows` (draw.cpp), the Multiplayer row's
 line commented out, and `gfx/menuabout.lmp` (the ELF's, served by `Draw_CachePic`) in the slot

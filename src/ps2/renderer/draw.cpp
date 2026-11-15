@@ -457,6 +457,56 @@ void FillRect(const float x, const float y, const float width, const float heigh
     ps2::rs::FillRect(rect.x, rect.y, rect.width, rect.height, r, g, b, a);
 }
 
+// ------------------------------------------------------------------------------------------------
+// Crosshairs
+// ------------------------------------------------------------------------------------------------
+//
+// Quake II's three crosshairs (its pics/ch1.pcx to ch3.pcx, 8x8 each), made of the runs of pixels
+// they set rather than read or baked in as images. As rectangles they draw as GS fills, each
+// pixel exactly where the canvas puts it: a pic would be a sprite, which covers a column and a row
+// more than its rectangle (gs-renderer.md), and its one-pixel lines would come out uneven at 1x.
+//
+// In the crosshair canvas's units, 0,0 being the pixel to the right of and below the 3D view's
+// centre: the pic's pixel (4,4), which Quake II put there by centring the 8x8 pic.
+
+struct CrosshairRect
+{
+    s8 x, y, width, height;
+};
+
+constexpr CrosshairRect kCrossRects[] = { // ch1: a dashed cross, a gap of one around its empty centre
+    {  0, -3, 1, 2 },
+    {  0,  2, 1, 2 },
+    { -3,  0, 2, 1 },
+    {  2,  0, 2, 1 },
+};
+constexpr CrosshairRect kDotRects[]   = { { 0, 0, 1, 1 } };                  // ch2: the centre pixel
+constexpr CrosshairRect kAngleRects[] = { { 0, 0, 4, 1 }, { 0, 1, 1, 3 } }; // ch3: an L, its corner on the centre
+
+struct CrosshairShape
+{
+    const CrosshairRect * rects;
+    int                   count;
+    int                   colour; // a palette index: Quake II's colours, which Quake's palette has too
+};
+
+constexpr CrosshairShape kCrosshairs[] = {
+    { kCrossRects, ps2::ArrayLength(kCrossRects), 15  }, // 235 grey
+    { kDotRects,   ps2::ArrayLength(kDotRects),   251 }, // red
+    { kAngleRects, ps2::ArrayLength(kAngleRects), 251 },
+};
+
+// The rectangle's pixels, and no more: rs::FillRect covers one column and one row past what it is
+// given, as every 2D draw does (gs-renderer.md), so the far edges are pulled in by one. A unit is
+// at least a pixel (the canvas's scale is at least 1), so the size never goes below zero.
+void FillCrosshairRect(const CrosshairRect & rect, const u32 rgba)
+{
+    const ScreenRect r = ToScreen(static_cast<float>(rect.x), static_cast<float>(rect.y),
+                                  static_cast<float>(rect.width), static_cast<float>(rect.height));
+    ps2::rs::FillRect(r.x, r.y, r.width - 1, r.height - 1, static_cast<u8>(rgba & 0xFFu),
+                      static_cast<u8>((rgba >> 8) & 0xFFu), static_cast<u8>((rgba >> 16) & 0xFFu), 255);
+}
+
 } // namespace
 
 // ------------------------------------------------------------------------------------------------
@@ -759,6 +809,20 @@ void PS2_DrawPicAlpha(int x, int y, const qpic_t * pic, float alpha)
 }
 
 // The rows are held to the pic's own: a mod's gfx/mainmenu.lmp may be shorter than id's.
+// Quake II clamped its crosshair cvar into range, so any other style draws the nearest shape. The
+// scale is the canvas's (scr_crosshairscale, 1 to 10), and so is the centring.
+void PS2_DrawCrosshair(const int style)
+{
+    PS2_PROFILE_SCOPED_EVENT(ps2::prof_evt::Ui);
+
+    const CrosshairShape & shape = kCrosshairs[std::clamp(style, 1, ps2::ArrayLength(kCrosshairs)) - 1];
+    const u32 rgba = ps2::gamma::Palette()[shape.colour];
+    for (int i = 0; i < shape.count; ++i)
+    {
+        FillCrosshairRect(shape.rects[i], rgba);
+    }
+}
+
 void PS2_DrawPicRows(int x, int y, const qpic_t * pic, int firstRow, int numRows)
 {
     PS2_PROFILE_SCOPED_EVENT(ps2::prof_evt::Ui);

@@ -39,6 +39,11 @@ void PS2_DrawPicRows(int x, int y, const qpic_t * pic, int firstRow, int numRows
 void PS2_SetScissor2D(int x, int y, int width, int height);
 void PS2_ResetScissor2D(void);
 
+// SCR_DrawCrosshair's crosshair (gl_screen.c), in the canvas it set up (CANVAS_CROSSHAIR): one of
+// Quake II's three for 'style', the crosshair cvar's value, in place of QuakeSpasm's '+' glyph.
+// 1 is the dashed cross, 2 the dot, 3 the angle; any other style draws the nearest of them.
+void PS2_DrawCrosshair(int style);
+
 // ------------------------------------------------------------------------------------------------
 // View (view.c)
 // ------------------------------------------------------------------------------------------------

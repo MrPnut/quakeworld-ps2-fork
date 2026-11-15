@@ -27,6 +27,7 @@
 #include "ps2/renderer/view.h"
 #include "ps2/renderer/vram.h"
 #include "ps2/menu/page_layout.h"
+#include "ps2/math/math.h"
 #include "ps2/tests/draw_cube.h"
 #include "ps2/save/save_notice.h"
 #include "ps2/save/save_system.h"
@@ -48,6 +49,12 @@
 // so does this, for the GS.
 extern "C" {
     #include "quake/cfgfile.h"
+}
+
+// view.c's crosshair, which the Video Options page steps. No header has it: gl_screen.c declares it
+// where it uses it, too.
+extern "C" {
+extern cvar_t crosshair;
 }
 
 namespace {
@@ -108,8 +115,8 @@ void ReadInitCvars()
 // hooks menu.c calls (gl_vidsdl.c's has the PC's modes). This one has the PS2's, laid out as
 // QuakeSpasm's Options page is: the TV standard and the framebuffer format, which apply on the next
 // boot, then the picture's place on the TV, the texture filtering, the dithering, the dynamic
-// lights, the models' shadows, the particles' shape, the GS latency, the FPS counter and the debug
-// panels, which apply at once. Each row steps its cvar through its values with left, right or Enter.
+// lights, the models' shadows, the particles' shape, the crosshair and its size, the GS latency,
+// the FPS counter and the debug panels, which apply at once. Each row steps its cvar through its values with left, right or Enter.
 
 struct VideoRow
 {
@@ -173,6 +180,45 @@ void SetParticlesIndex(const int index)
     Cvar_Set(r_particles.name, (index == 1) ? "2" : "1");
 }
 
+// The crosshair rows: which of Quake II's crosshairs view.c's crosshair cvar picks (draw.cpp's
+// PS2_DrawCrosshair), and the size scr_crosshairscale draws it at, from Quake II's choices. Both
+// read the way the drawing does, so a value typed at the console shows as the row it draws like:
+// a crosshair past 3 as the angle, a scale as the nearest step.
+constexpr const char * kCrosshairNames[]     = { "none", "cross", "dot", "angle" };
+constexpr const char * kCrosshairScaleNames[] = { "1x", "1.5x", "2x", "2.5x", "3x" };
+constexpr float        kCrosshairScales[]     = { 1.0f, 1.5f, 2.0f, 2.5f, 3.0f };
+static_assert(ps2::ArrayLength(kCrosshairScaleNames) == ps2::ArrayLength(kCrosshairScales));
+
+int CrosshairIndex()
+{
+    const int style = static_cast<int>(crosshair.value);
+    return (style == 0) ? 0 : std::clamp(style, 1, ps2::ArrayLength(kCrosshairNames) - 1);
+}
+
+void SetCrosshairIndex(const int index)
+{
+    Cvar_SetValue(crosshair.name, static_cast<float>(index));
+}
+
+int CrosshairScaleIndex()
+{
+    int best = 0;
+    for (int i = 1; i < ps2::ArrayLength(kCrosshairScales); ++i)
+    {
+        if (ps2::math::Fabsf(kCrosshairScales[i] - scr_crosshairscale.value) <
+            ps2::math::Fabsf(kCrosshairScales[best] - scr_crosshairscale.value))
+        {
+            best = i;
+        }
+    }
+    return best;
+}
+
+void SetCrosshairScaleIndex(const int index)
+{
+    Cvar_SetValue(scr_crosshairscale.name, kCrosshairScales[index]);
+}
+
 const VideoRow kVideoRows[] = {
     { "Video mode",     "auto is the console's own; on restart",   &s_videoMode,                         kVideoModes, kVideoModeNames,  3,                     nullptr,            nullptr,               false },
     { "Color depth",    "16-bit leaves more VRAM; on restart",     &s_fb16Bit,                           kFbFormats,  kFbFormatNames,   2,                     nullptr,            nullptr,               false },
@@ -183,6 +229,8 @@ const VideoRow kVideoRows[] = {
     { "Dynamic lights", "vertex: on VU1, no lightmap rebuilds",    nullptr,                              nullptr,     kDlightModeNames, 3,                     DynamicLightsIndex, SetDynamicLightsIndex, false },
     { "Model shadows",  "a shadow on the ground under each model", &r_shadows,                           kOffOn,      nullptr,          2,                     nullptr,            nullptr,               false },
     { "Particles",      "square: as software Quake drew them",     nullptr,                              nullptr,     kParticleNames,   2,                     ParticlesIndex,     SetParticlesIndex,     false },
+    { "Crosshair",      "Quake II's: a cross, a dot or an angle",  nullptr,                              nullptr,     kCrosshairNames,  4,                     CrosshairIndex,     SetCrosshairIndex,     false },
+    { "Crosshair size", "bigger, for a TV across the room",        nullptr,                              nullptr,     kCrosshairScaleNames, 5,                 CrosshairScaleIndex, SetCrosshairScaleIndex, false },
     { "GS latency",     "a frame ahead: faster, one frame of lag", &s_gsLatency,                         kOffOn,      nullptr,          2,                     nullptr,            nullptr,               false },
     { "Show FPS",       "frames per second, at the top right",     &ps2::overlay::FpsCounterCvar(),      kOffOn,      nullptr,          2,                     nullptr,            nullptr,               false },
     { "Debug overlays", "memory, VRAM and profiling panels",       &ps2::overlay::DebugOverlaysCvar(),   kOffOn,      nullptr,          2,                     nullptr,            nullptr,               false },

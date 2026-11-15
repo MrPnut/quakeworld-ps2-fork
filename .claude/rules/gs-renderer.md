@@ -162,7 +162,9 @@ the world, the entity passes, the glows), `brush.cpp` (per-surface draw data, bu
   passes x + w - 1 and reads back exact 2x2 texels. `gs::EmitTexturedRect` passes x + w: every
   2D pic and glyph draws a column and a row wider than its rectangle, the last repeating the one
   before (the menus' 64x288 plaque covers 65x289, 5846 of its pixels off an exact 2x2 mapping;
-  measured 2026-10-13). Changing it changes every 2D draw, so it waits for a decision.
+  measured 2026-10-13). Changing it changes every 2D draw, so it waits for a decision. Fills do the
+  same: the crosshairs (draw.cpp's `FillCrosshairRect`) pass the size less one to come out exact,
+  and would need it back if the offsets changed.
 
 ## Texture coordinates and sizes
 

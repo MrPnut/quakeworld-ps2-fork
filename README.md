@@ -331,8 +331,11 @@ those directly on the PS2's hardware, with no GL underneath.
   more VRAM for textures), the picture's place on the TV (Screen X and Y, for a set that cuts an
   edge off: a white line marks the picture's edge while either row is under the cursor), the
   texture filtering, dithering, the dynamic lights (lightmaps, vertex or glows), the models'
-  shadows, round or square particles, the GS latency, and the FPS counter and debug overlays.
-  The first two apply after a restart. The Options page itself has the save device: the memory
+  shadows, round or square particles, the crosshair and its size, the GS latency, and the FPS
+  counter and debug overlays. The first two apply after a restart. The crosshairs are Quake II's
+  three (a dashed cross, a dot and an angle; QuakeSpasm's `crosshair` cvar picks 1 to 3, 0 being
+  none, the default), drawn as fills of their pixels rather than as pictures
+  ([draw.cpp](src/ps2/renderer/draw.cpp)), at 1 to 3 times their size (`scr_crosshairscale`). The Options page itself has the save device: the memory
   card, or the drive the game booted from (see [Save games](#save-games)).
 - **Brightness and Contrast** (the Options page's sliders, QuakeSpasm's `gamma` and `contrast`):
   QuakeSpasm applies them to the finished frame, which the GS has no stage for, so here they go
