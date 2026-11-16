@@ -55,9 +55,12 @@ skyboxes or other external textures.
    | Tool | Comes from | Typical location |
    | --- | --- | --- |
    | `mips64r5900el-ps2-elf-gcc` / `-g++` | ps2toolchain | `$PS2DEV/ee/bin` |
-   | `openvcl` | openvcl | `$PS2DEV/bin` |
    | `dvp-as` | ps2toolchain (dvp) | `$PS2DEV/dvp/bin` |
    | `bin2c` | ps2sdk | `$PS2SDK/bin` |
+
+   The VU microprograms are compiled by [oxide-vcl](https://github.com/glampert/oxide-vcl),
+   which the build makes from its submodule (below) with **cargo**, a recent stable Rust from
+   [rustup](https://rustup.rs); the toolchain's `openvcl` is not used.
 
    A `~/.zshenv` (or equivalent) along these lines is what the Makefile and the VSCode tasks expect:
 
@@ -107,11 +110,12 @@ skyboxes or other external textures.
 
 ### Building
 
-Three dependencies are git submodules under [src/tools/](src/tools/):
-[vclpp](https://github.com/glampert/vclpp) (the VU microprogram preprocessor),
-[vu-checker](https://github.com/glampert/vu-checker) (checks on the VU toolchain's output) and
-[miniz](https://github.com/richgel999/miniz) (deflate, for the save games and the compressed packs).
-Clone with `--recursive`, or run `git submodule update --init --recursive` in an existing clone.
+Two dependencies are git submodules under [src/tools/](src/tools/):
+[oxide-vcl](https://github.com/glampert/oxide-vcl) (the VCL compiler the VU microprograms are
+built with, preprocessor included; cargo makes it into `build/tools/oxide-vcl/`, once, and again
+only when the submodule moves) and [miniz](https://github.com/richgel999/miniz) (deflate, for the
+save games and the compressed packs). Clone with `--recursive`, or run
+`git submodule update --init --recursive` in an existing clone.
 
 ```sh
 make            # debug build   -> build/debug/quake.elf (+ host tools)
@@ -554,8 +558,7 @@ src/
   tools/
     host/               host-side command line tools (unpak, imgdump, musenc, pakzip)
     scripts/            Python helpers (symbolize, compile_commands.json, frame logs, the USB image, the About item) and make_github_release.sh
-    vclpp/              VCL preprocessor for the VU microprograms (git submodule)
-    vu-checker/         openvcl/dvp-as output checks run by every VU build (git submodule)
+    oxide-vcl/          VCL compiler and preprocessor for the VU microprograms (git submodule)
     miniz/              deflate codec for the save games, the compressed packs and pakzip (git submodule)
     vscode_extensions/  VCL/VU assembly syntax highlighting for VSCode
 ```

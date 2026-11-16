@@ -7,8 +7,9 @@ paths:
 
 - **`ps2.yml`** runs `make`, then `make release`, on Linux inside the ps2dev project's
   `ghcr.io/ps2dev/ps2sdk` image, for every push or PR that changes more than the docs, the
-  editor settings or the default `id1/config.cfg`. So it also builds vclpp, the VU programs
-  (with their checks) and the host tools. It is a compile check and keeps no ELF: releases are
+  editor settings or the default `id1/config.cfg`. So it also builds oxide-vcl
+  (`src/tools/oxide-vcl`, with cargo), the VU programs and the host tools. It is a compile
+  check and keeps no ELF: releases are
   packaged from local builds (`make_github_release.sh`), and the IOP modules an ELF embeds come
   from the SDK that built it.
 - **`tools.yml`** builds the host tools alone, with GCC, Apple clang and MSVC, when they or the
@@ -28,14 +29,17 @@ paths:
 - Alpine, with the EE, IOP and dvp toolchains (openvcl and masp included) and the PS2SDK
   under `/usr/local/ps2dev`. Its environment sets `PS2DEV`, `PS2SDK` and `PATH`, and the
   Makefile's `?=` defaults yield to them. It has nothing for the host side: the job adds
-  `build-base cmake python3 git` with apk. `ghcr.io/ps2dev/ps2dev` is the same plus
+  `build-base cmake python3 git rustup` with apk, then installs Rust (below).
+  `ghcr.io/ps2dev/ps2dev` is the same plus
   ps2sdk-ports, gsKit and ps2-packer (290 MB compressed, against 195), none of which the game
   links.
 - **Pinned by digest** (the multi-arch index), not `:latest`, so a new upstream GCC or SDK
   can't turn CI red with nothing changed here. GHCR keeps superseded digests: builds from July
   and August 2026 still resolved in October.
-- **`v2.0.0`, the only release tag since 2021, can't build this tree.** openvcl and masp
-  joined ps2toolchain-dvp on 2026-05-18, two days after it. Every `latest` since has them.
+- **`v2.0.0`, the only release tag since 2021, could not build this tree** while openvcl
+  compiled the VU programs: openvcl and masp joined ps2toolchain-dvp on 2026-05-18, two days
+  after it. The build now takes only dvp-as from the dvp toolchain (oxide-vcl compiles); whether
+  v2.0.0 builds the tree since is unchecked.
 - The pin, as of 2026-11-04: `latest` as built on 2026-11-03, which is ps2sdk `d41ea62` (the
   first with audsrv's `thpri=`, PR #952), GCC 15.2.0, binutils 2.45.1, newlib 4.6.0 (`8881dc4`,
   built with `HAVE_BLKSIZE`, so stdio sizes its buffers from `st_blksize`), openvcl 0.4.0, on
@@ -59,6 +63,18 @@ paths:
   Listing GHCR package versions through the GitHub API needs the `read:packages` scope, which
   the local token lacks.
 
+## Rust
+
+- oxide-vcl is Rust (edition 2024) with no crate dependencies. The job installs it with
+  Alpine's `rustup` package: `rustup-init -y --profile minimal --default-toolchain stable`,
+  for the musl host, then puts `$HOME/.cargo/bin` on `GITHUB_PATH`. Alpine's own `rust`
+  package can lag behind the release the edition and oxide-vcl's code need.
+- **`stable` is not pinned**, unlike the image: a new Rust release reaches CI unannounced. It
+  changes how oxide-vcl is built, not what it generates. If a release ever breaks the build,
+  pin it with `--default-toolchain 1.NN`.
+- The Makefile builds oxide-vcl into `build/tools/oxide-vcl/` (cargo's `--target-dir`), once
+  for both configs: `make release` reuses the debug run's.
+
 ## Checking a Linux build without Docker
 
 This Mac has no Docker, but the image's target files (headers, libraries, IRX modules, the
@@ -79,7 +95,7 @@ compiler warnings. That SDK's `samples/Makefile.*` and the 13 IRX modules the ga
 byte-identical to the local install's, both being `329e2bb`. It can't check the Linux binaries
 themselves, musl or make 4.4. For Alpine's GCC 15 warnings, the `-mabi=64` stand-in in
 backend-cpp.md found nothing in the host tools, with or without glibc's `warn_unused_result`
-declarations. vclpp is pinned at the commit quake2-ps2's CI already builds with that GCC.
+declarations.
 
 ## Traps
 
