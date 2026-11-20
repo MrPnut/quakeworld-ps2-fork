@@ -58,9 +58,10 @@ skyboxes or other external textures.
    | `dvp-as` | ps2toolchain (dvp) | `$PS2DEV/dvp/bin` |
    | `bin2c` | ps2sdk | `$PS2SDK/bin` |
 
-   The VU microprograms are compiled by [oxide-vcl](https://github.com/glampert/oxide-vcl),
-   which the build makes from its submodule (below) with **cargo**, a recent stable Rust from
-   [rustup](https://rustup.rs); the toolchain's `openvcl` is not used.
+   The VU microprograms are written in VUSL and compiled by `oxide-vusl`, from
+   [oxide-vcl](https://github.com/glampert/oxide-vcl), which the build makes from its submodule
+   (below) with **cargo**, a recent stable Rust from [rustup](https://rustup.rs); the toolchain's
+   `openvcl` is not used.
 
    A `~/.zshenv` (or equivalent) along these lines is what the Makefile and the VSCode tasks expect:
 
@@ -111,9 +112,9 @@ skyboxes or other external textures.
 ### Building
 
 Two dependencies are git submodules under [src/tools/](src/tools/):
-[oxide-vcl](https://github.com/glampert/oxide-vcl) (the VCL compiler the VU microprograms are
-built with, preprocessor included; cargo makes it into `build/tools/oxide-vcl/`, once, and again
-only when the submodule moves) and [miniz](https://github.com/richgel999/miniz) (deflate, for the
+[oxide-vcl](https://github.com/glampert/oxide-vcl) (whose `oxide-vusl` compiles the VU
+microprograms from VUSL; cargo makes it into `build/tools/oxide-vcl/`, once, and again only when
+the submodule moves) and [miniz](https://github.com/richgel999/miniz) (deflate, for the
 save games and the compressed packs). Clone with `--recursive`, or run
 `git submodule update --init --recursive` in an existing clone.
 
@@ -300,7 +301,9 @@ QuakeSpasm draws through the public functions of its OpenGL renderer; the backen
 those directly on the PS2's hardware, with no GL underneath.
 
 - **The frame** is one DMA chain, built by the EE while the GS draws the previous one. 3D goes
-  through VU1 microprograms; 2D goes straight to the GS. The wait for vsync that paces the frames
+  through VU1 microprograms, written in
+  [VUSL](https://github.com/glampert/oxide-vcl/blob/main/docs/VUSL.md), a GLSL-like language for
+  VU1; 2D goes straight to the GS. The wait for vsync that paces the frames
   sleeps on the vblank interrupt (a semaphore signalled from an `INTC_VBLANK_S` handler), so the
   8-11 ms a frame leaves before its field ends go to the other threads, the background loader
   above all; `ps2_vsync_spin 1` brings the old status-register spin back.
@@ -544,7 +547,7 @@ src/
   ps2/                  the PS2 backend - all new C++ code
     system/             main() entry point, Sys_* seam, IOP boot, dlmalloc heap
     renderer/           GS front-end, VRAM heap, textures, models, VU1 path
-      vu1progs/         VU1 microprograms (.vcl)
+      vu1progs/         VU1 microprograms (.vusl) and their shared frame.vush
     audio/              SNDDMA_* seam, audsrv device, mix ring, CD music streaming
     input/              IN_* seam, DualShock pad and rumble, USB keyboard
     math/               vector/matrix math for the renderer
@@ -558,9 +561,9 @@ src/
   tools/
     host/               host-side command line tools (unpak, imgdump, musenc, pakzip)
     scripts/            Python helpers (symbolize, compile_commands.json, frame logs, the USB image, the About item) and make_github_release.sh
-    oxide-vcl/          VCL compiler and preprocessor for the VU microprograms (git submodule)
+    oxide-vcl/          VUSL and VCL compilers, for the VU microprograms (git submodule)
     miniz/              deflate codec for the save games, the compressed packs and pakzip (git submodule)
-    vscode_extensions/  VCL/VU assembly syntax highlighting for VSCode
+    vscode_extensions/  VUSL, VCL and VU assembly syntax highlighting for VSCode
 ```
 
 ---

@@ -6,7 +6,7 @@
  *  1.5 units each times a scale that grows with the particle's depth (1 + depth * 0.004, so it
  *  never shrinks under a pixel), with a disc in the corner of the texture where the triangle's
  *  right angle is. Here the disc is a texture of its own and the quad around it a GS sprite, which
- *  particles.vcl expands with the same scale: the disc comes out as wide and in the same place.
+ *  particles.vusl expands with the same scale: the disc comes out as wide and in the same place.
  *
  * This source code is released under the GNU GPL v2 license.
  * ================================================================================================ */
@@ -56,9 +56,7 @@ void Draw()
     {
         const u32 rgb = palette[static_cast<int>(p->color) & 0xFF] & 0x00FFFFFFu;
         out->rgba = rgb | (0x80u << 24);
-        out->x    = p->org[0];
-        out->y    = p->org[1];
-        out->z    = p->org[2];
+        out->pos  = { p->org[0], p->org[1], p->org[2] };
     }
 
     const bool  squares = (static_cast<int>(r_particles.value) == 2);

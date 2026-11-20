@@ -187,8 +187,8 @@ the world, the entity passes, the glows), `brush.cpp` (per-surface draw data, bu
 - **Water had the same problem, and the loader can't shift it.** It arrives in raw texels, and
   the ripple's phase is a function of them. *(Q2)* On a console its texture wobbled as the camera
   turned, most visibly on the triangles the camera stood in (2026-10-11). So VU1 shifts the
-  *output* by whole repeats, per triangle, after the warp (`WarpCorners` in
-  textured_triangles.vcl); confirmed on hardware there. This port runs the same program
+  *output* by whole repeats, per triangle, after the warp (`warpCorners` in
+  textured_triangles.vusl); confirmed on hardware there. This port runs the same program
   (2026-10-13).
 - **Skins and sprite frames are copied with their rows padded to 16 texels**, as draw.cpp's
   pics are: the upload sends `w*h` texels in whole quadwords, and 16 of the 61 shareware models

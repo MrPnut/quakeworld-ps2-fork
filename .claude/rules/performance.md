@@ -215,6 +215,13 @@ paths:
 - **No GS-internal cost.** CLUT loads, fill rate, texture cache and overdraw are free. Only
   data moved (DMA/GIF qwords) and EE/VU1 instructions are charged. For GS-side changes,
   promise "no regression", never a measurable win.
+- **VU1 program changes don't show either**: the EE never waits on VU1 here (GsWait ~39 µs a
+  frame). The switch to VUSL (2026-11-21, debug `ps2_perftest`, `build/baselines/q1-vusl-head-perf`
+  against `q1-vusl-new-perf`) matched within ±1% on every column, the same 13170 frames. Its
+  draw counts moved less than two runs of the old build did between themselves
+  (`q1-vusl-head2-perf`), whose triangle counts differed in 5606 of the rows: particles and
+  monsters follow the frame timing, so this port's counts vary between runs. The VU1 cost is measured on oxide-vcl's scenes instead (see
+  [vu-microprograms.md](vu-microprograms.md)).
 - **PCSX2 charges roughly per instruction** (~2.5-3 cycles per EE instruction seemed to
   apply). Only a net instruction-count cut shows up. An MMI change that swapped 5 memory ops
   for 1 extra instruction measured *slower* (+3.1%) and was reverted, even though it should

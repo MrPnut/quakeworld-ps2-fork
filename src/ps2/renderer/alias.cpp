@@ -4,7 +4,7 @@
  *
  *  A pose is a list of byte-quantized vertices (trivertx_t), and QuakeSpasm draws an alias model
  *  lerped between two of them: scale_origin + scale * (pose1 * (1 - blend) + pose2 * blend). Here
- *  that lerp runs on VU1, on the keyframe format of textured_triangles.vcl. The EE gathers each
+ *  that lerp runs on VU1, on the keyframe format of textured_triangles.vusl. The EE gathers each
  *  corner's two pose words verbatim into the command buffer and the microprogram converts, lerps
  *  and transforms them, with 'scale_origin' folded into the matrix's last row and the two scales
  *  riding with the draw. What else a corner needs - which pose vertex it is, its skin coordinates
