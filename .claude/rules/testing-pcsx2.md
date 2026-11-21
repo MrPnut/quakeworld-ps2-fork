@@ -274,6 +274,11 @@ The rest are scripted runs:
   in both: a build that runs faster integrates the moves in smaller steps and ends somewhere
   else, collision or not. The float collision change (2026-10-10) ended in the same places on
   e1m1 and e4m7 and within 5 units on e2m2.
+  e2m2's run is timing-sensitive even at 20 fps: a build that changed no math, only adding a
+  ~60 µs spin per frame, ended its strafe 18 units from HEAD's (y -985 against -1003), the same
+  place as the FP flags' build (2026-11-21), while e1m1 and e4m7 matched to the unit. Two runs
+  of one ELF match exactly. So compare a change against a timing-only control before reading a
+  difference there as a physics change.
 - **Config write**: `quit` runs `Host_Shutdown`, which writes `id1/config.cfg` through
   `host:`. Then PCSX2 boots into the PS2 BIOS menu; stop it there.
 - **Stop every PCSX2 you launch once its log is read.** A run stays open after the game halts,

@@ -314,6 +314,19 @@ EE_INCS += -I$(SRC_DIR)
 # The VU programs' generated headers (see VU_HEADERS), included by vu1.h by bare name.
 EE_INCS += -I$(BUILD_DIR)/vu
 
+# Floating-point semantics, for QuakeSpasm's C and the backend C++ alike. GCC already models
+# the EE FPU as having no NaN or Inf (sqrtf is a bare sqrt.s, fabsf an abs.s), so what is
+# left to give up is the sign of zero: -fno-signed-zeros lets GCC turn each float clamp
+# (x < lo ? lo : x) into a branchless min.s/max.s and fold x + 0.0f away. Here the perf
+# test moved only Sky (-4.9%); Quake II's per-particle clamp gained 13.7% from it. The
+# other two are near no-ops kept for intent: -fno-math-errno is already implied,
+# -fno-trapping-math moves a few instructions. Soft-float double math keeps its signed
+# zeros and NaNs in libgcc, so this changes little there. The EE has no FP exceptions
+# either way. Nothing may depend on the sign of a zero result: x / -0.0f saturates to
+# -FLT_MAX, x / 0.0f to +FLT_MAX.
+# Override with EE_FPFLAGS= (and a separate OUTPUT_DIR) for an A/B.
+EE_FPFLAGS ?= -fno-math-errno -fno-trapping-math -fno-signed-zeros
+
 # The C side of the build is QuakeSpasm, the vendored dlmalloc and the bin2c IRX
 # blobs - everything of ours is C++. QuakeSpasm is C11: common.h's q_min/q_max/CLAMP
 # use _Generic there, and GCC 15 would otherwise compile it as C23. It keeps the
@@ -324,7 +337,7 @@ EE_INCS += -I$(BUILD_DIR)/vu
 # those would turn a float expression into libgcc soft-float calls. The backend's
 # C++ needs no such flag: it uses f suffixes, and -Wdouble-promotion enforces them.
 #
-EE_CFLAGS += -std=gnu11 -fno-strict-aliasing -fsingle-precision-constant $(COMMON_DEFS) -MMD -MP
+EE_CFLAGS += -std=gnu11 -fno-strict-aliasing -fsingle-precision-constant $(EE_FPFLAGS) $(COMMON_DEFS) -MMD -MP
 
 # Strict, portable, warnings-as-errors for the new C++ backend (applies ONLY to
 # our .cpp - QuakeSpasm's C above stays lenient). The set targets portability and
@@ -350,7 +363,7 @@ EE_CXX_SYSINCS = -isystem $(PS2SDK)/ee/include -isystem $(PS2SDK)/common/include
 
 # Lean, embedded C++ for the new backend.
 EE_CXXFLAGS += -std=gnu++20 -fno-exceptions -fno-rtti -fno-threadsafe-statics \
-	-fno-strict-aliasing $(COMMON_DEFS) \
+	-fno-strict-aliasing $(EE_FPFLAGS) $(COMMON_DEFS) \
 	$(EE_CXX_WARNFLAGS) $(EE_CXX_SYSINCS) \
 	-MMD -MP
 

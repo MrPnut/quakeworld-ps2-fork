@@ -199,6 +199,20 @@ paths:
   rejected, because asm memory operands push register-promoted locals back to memory (+56%
   instructions in `DrawAliasMD2Entity`). The reasons are recorded in `vec_mat.h`'s header.
 - `__builtin_ctz/clz` are libgcc calls on the EE. A per-batch ctz cost TexChains +9%.
+- **GCC models the R5900 FPU as having no NaN or Inf**, so `-fno-math-errno` is already
+  implied: GCC 15.2 emits a bare `sqrt.s` for `sqrtf`, `abs.s` for `fabsf`, `min.s` for
+  `fminf` and `rsqrt.s` for `1.0f / sqrtf(x)`, with or without the flag. libgcc's soft-float
+  doubles are IEEE, NaN and signed zeros included.
+- **The FP flags** (`EE_FPFLAGS` in the Makefile since 2026-11-21: `-fno-math-errno
+  -fno-trapping-math -fno-signed-zeros`, as on the Quake II port). `-fno-signed-zeros` does
+  the work: float clamps written as compare-and-select become branchless `min.s`/`max.s`,
+  and `x + 0.0f` folds. Release: 98 functions, -813 instructions, -3.2 KB of text, and 6 fewer
+  static soft-float call sites (1068 to 1062). Measured in debug builds
+  (`build/baselines/fpflags-*`): over the demos EE work -0.25% against a HEAD re-run's -0.22%,
+  so no gain beyond noise, except Sky -4.9% (`sky::Draw`, about 0.9 µs a frame); over the
+  map tour every column within code-layout noise (EE +0.06%, Sky -2%). Quake II gained more
+  (Particles -13.7%) because its per-particle alpha clamp is one of those clamps; this port's
+  particle loop has none.
 
 ## What a PCSX2 capture can and can't show
 
