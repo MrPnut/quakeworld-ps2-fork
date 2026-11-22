@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 #
 # Builds the GitHub release packages from a clean tree: `make clean`, then
-# `make` and `make release`, then github_rel_<version>/ at the repo root with
-# one folder and one zip per config:
+# `make`, `make release` and the disc build's ELF (`make BUILD=iso_release`),
+# then github_rel_<version>/ at the repo root with one folder and one zip per
+# config:
 #
 #   q1ps2_<config>_<version>/
 #     quake.elf
 #     quake_unstripped.elf  only with -u
+#     quake_disc.elf        release only: the disc build (build/iso_release/)
+#     quake_disc_unstripped.elf  release only, with -u
+#     make_iso.py           release only: makes a disc image from quake_disc.elf
+#                           and the player's id1/
 #     LICENSE               the GPL, which the binaries must ship with
 #     RELEASE_NOTES.txt     misc/RELEASE_NOTES.txt, @VERSION@ and @COMMIT@ filled in
 #     id1/
@@ -14,7 +19,9 @@
 #       music/          empty, for the player's trackNN.adp files
 #
 # The player adds the paks (id1/pak0.pak, and pak1.pak for the registered
-# game). The zips are what gets attached to the GitHub release.
+# game), and for a disc image runs
+# `python3 make_iso.py --elf quake_disc.elf --data id1 -o quake.iso` in the
+# release folder. The zips are what gets attached to the GitHub release.
 
 set -euo pipefail
 
@@ -72,7 +79,8 @@ if [ -e "$out_dir" ] && [ "$force" -eq 0 ]; then
 fi
 
 release_notes="misc/RELEASE_NOTES.txt"
-for file in LICENSE "$release_notes"; do
+make_iso="src/tools/scripts/make_iso.py"
+for file in LICENSE "$release_notes" "$make_iso"; do
     [ -f "$file" ] || die "$file is missing"
 done
 
@@ -93,11 +101,14 @@ echo "==> make (debug)"
 make || die "debug build failed"
 echo "==> make release"
 make release || die "release build failed"
+# The ELF alone: `make iso` would also make an image from the repo's id1/.
+echo "==> make BUILD=iso_release (disc build)"
+make BUILD=iso_release || die "disc build failed"
 
 elfs=(quake.elf)
 [ "$unstripped" -eq 0 ] || elfs+=(quake_unstripped.elf)
 
-for config in debug release; do
+for config in debug release iso_release; do
     for elf in "${elfs[@]}"; do
         [ -f "build/$config/$elf" ] || die "build/$config/$elf is missing after the build"
     done
@@ -116,6 +127,12 @@ for config in debug release; do
     for elf in "${elfs[@]}"; do
         cp "build/$config/$elf" "$pkg/"
     done
+    if [ "$config" = release ]; then
+        for elf in "${elfs[@]}"; do
+            cp "build/iso_release/$elf" "$pkg/${elf/quake/quake_disc}"
+        done
+        cp "$make_iso" "$pkg/"
+    fi
     cp LICENSE "$pkg/"
     sed -e "s/@VERSION@/$version/g" -e "s/@COMMIT@/$commit/g" "$release_notes" > "$pkg/RELEASE_NOTES.txt"
     git show HEAD:id1/config.cfg > "$pkg/id1/config.cfg"

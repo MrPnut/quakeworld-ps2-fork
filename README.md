@@ -162,10 +162,13 @@ and keeps the Windows executables as an artifact, `host-tools-windows-x64`, on e
 the repository's Actions tab, for 90 days. Downloading it needs a GitHub sign-in.
 
 [make_github_release.sh](src/tools/scripts/make_github_release.sh) `[-f] [-u] [version]` cuts a
-release: a clean build of both configs, each config's `quake.elf` packaged with `LICENSE`,
-[RELEASE_NOTES.txt](misc/RELEASE_NOTES.txt) (its `@VERSION@` and `@COMMIT@` filled in, so it points
-to the exact source) and an `id1/` holding the default `config.cfg` and an empty `music/` folder,
-zipped into `github_rel_<version>/`. `-u` adds `quake_unstripped.elf`. The player adds the paks.
+release: a clean build of both configs and the disc build's ELF, each config's `quake.elf` packaged
+with `LICENSE`, [RELEASE_NOTES.txt](misc/RELEASE_NOTES.txt) (its `@VERSION@` and `@COMMIT@` filled
+in, so it points to the exact source) and an `id1/` holding the default `config.cfg` and an empty
+`music/` folder, zipped into `github_rel_<version>/`. The release package also holds the disc build
+as `quake_disc.elf` and [make_iso.py](src/tools/scripts/make_iso.py), so a player can make a disc
+image from their own `id1/` (`python3 make_iso.py --elf quake_disc.elf --data id1 -o quake.iso`).
+`-u` adds `quake_unstripped.elf` (and `quake_disc_unstripped.elf`). The player adds the paks.
 
 ### Running in PCSX2
 
