@@ -122,6 +122,7 @@ save games and the compressed packs). Clone with `--recursive`, or run
 make            # debug build   -> build/debug/quake.elf (+ host tools)
 make release    # optimized     -> build/release/quake.elf
 make run        # build, then launch it in PCSX2
+make iso        # disc build + disc image, see "Running from a disc image" below
 ```
 
 | | `make` (debug) | `make release` |
@@ -133,13 +134,15 @@ make run        # build, then launch it in PCSX2
 
 Both configs strip the ELF that runs and keep the symbols next to it in `quake_unstripped.elf`.
 `make compiledb` regenerates `compile_commands.json` for clangd, and `make clean` removes all
-build output.
+build output. The disc builds are two more configs, `iso_release` and `iso_debug` (`make iso`,
+`make iso_dbg`, or `BUILD=iso_release` / `BUILD=iso_debug` for the ELF alone), with the release
+and debug flags and `PS2_QUAKE_ISO=1`, which every config defines to 0 or 1.
 
 [CI](.github/workflows/ps2.yml) runs `make` and `make release` on Linux for every push and pull
 request that changes more than the documentation, inside the ps2dev project's
 [`ps2sdk` container image](https://github.com/ps2dev/ps2sdk/pkgs/container/ps2sdk), pinned to
-one build of it. It checks that both configs compile and link, and keeps no ELF: releases are
-packaged from local builds, as described below.
+one build of it, and then builds the two disc builds' ELFs. It checks that every config compiles
+and links, and keeps no ELF: releases are packaged from local builds, as described below.
 
 The host tools in [src/tools/host/](src/tools/host/) (`unpak`, `imgdump`, `musenc`, `pakzip`, into
 `build/tools/`) are a CMake project, [CMakeLists.txt](src/tools/host/CMakeLists.txt). `make`
@@ -228,7 +231,8 @@ mass:/QUAKE/
   than the `.pak` ones: a load reads half the bytes (the Quake II port's loads over USB took 25-40%
   less time from its `.pkz`, and about as long from the HDD). And format the stick FAT32 with
   **32 KB clusters or larger** (macOS picks 8 KB for a 16 GB stick; `sudo newfs_msdos -F 32 -c 64
-  -v NAME /dev/rdiskNsM` sets 32 KB, erasing the volume).
+  -v NAME /dev/rdiskNsM` sets 32 KB, erasing the volume, and
+  [format_usb_drive.sh](src/tools/scripts/format_usb_drive.sh) `diskN` does the whole drive).
 - **Saves and settings** go to the memory card in slot 1, never to the USB drive or the HDD.
 - **NTSC or PAL.** The game follows the console's own standard. Options → Video Options → Video
   mode forces one, after a restart, so a PAL console can run at 60 Hz on a TV that takes it.
@@ -249,6 +253,60 @@ Msd_ImagePathMsd = /absolute/path/to/quake-usb.img
 
 `[DEV9/Hdd]` `HddEnable` and `HddFile` attach an HDD image the same way. PCSX2 doesn't model
 either drive's speed, so its load times say nothing about a console's.
+
+### Running from a disc image (Open PS2 Loader, PCSX2)
+
+A **disc build** reads its game data off a CD/DVD instead: in practice a disc image that
+[Open PS2 Loader](https://github.com/ps2homebrew/Open-PS2-Loader) (OPL) runs from a USB drive,
+the HDD or a network share, or that PCSX2 boots like any game. The repository ships no game
+data, so the image is made from your own:
+
+```sh
+make iso        # disc build (release) -> build/iso_release/quake.elf + quake.iso
+make iso_dbg    # disc build (debug)   -> build/iso_debug/quake.elf + quake.iso
+make iso run    # the same, then boot the image in PCSX2
+```
+
+The image comes from `id1/` (`ISO_DATA=` for another folder; `ISO_FLAGS=--uncompressed-paks` puts
+the `.pak` files on it instead of the `.pkz`) through
+[make_iso.py](src/tools/scripts/make_iso.py), which also runs on its own:
+`make_iso.py --elf quake.elf --data /path/to/id1 -o quake.iso`. It is a small ISO9660 writer in
+plain Python, so nothing needs installing, and it picks the files as the USB image script does: of
+a `pakN.pak`/`pakN.pkz` pair the pkz, the music's `.adp` tracks (a track's `.wav` only when it has
+no `.adp`, which the game then plays instead), `config.cfg` and any `autoexec.cfg`, and none of
+what a run leaves behind (`save/`, screenshots, logs). With both `.pkz` packs and the soundtrack as
+`.adp` the image is about 110 MiB. It refuses an ELF that isn't a disc build, which would look for
+its data on `host:`, the HDD and USB.
+
+The disc's `SYSTEM.CNF` boots `cdrom0:\Q1PS_106.00;1`: OPL takes the boot file's name as the game's
+ID, the key of its per-game settings, virtual memory card and cheats. Copy the image into OPL's
+`CD` folder (`DVD` for one over 700 MiB) on the USB drive, HDD or share. OPL wants the image in one
+piece on a USB drive, so a freshly formatted one is the easy way: on macOS,
+[format_usb_drive.sh](src/tools/scripts/format_usb_drive.sh) `[-i quake.iso] diskN` erases a USB
+drive to FAT32 with 32 KB clusters, makes OPL's folders and copies the image in. It refuses any
+disk that isn't an external USB one, and asks you to type the disk's name first.
+
+What a disc build does differently:
+
+- **Its data comes off the disc**, through a read-only ISO9660 device of the game's own on top of
+  libcdvd's sector reads ([cdvd_device.h](src/ps2/fs/cdvd_device.h)), mounted as `cdrom0:`. OPL
+  swaps the IOP's CD drivers for its own, which answer those reads out of the image on its drive,
+  so the game can't tell an image from a disc. Names match whatever their case, any number of
+  files can be open, and nothing else of the game changes: the pkz, the background loader and the
+  music read the disc like any other drive.
+- **The boot resets the IOP once**, as a disc game does, and then loads no storage drivers at all.
+  OPL catches the reset and loads its own modules again, and only from that second reboot on its
+  virtual memory card and pad emulation. The ELF carries no HDD, USB or keyboard drivers, which
+  makes it about 210 KB smaller.
+- **Saves go to the memory card only**, and the Options page has no Save Device row. config.cfg is
+  the card's, and the disc's `id1/config.cfg` stands in for one the card hasn't got.
+- **No USB keyboard**: OPL running an image from USB has its own USB driver on the IOP, which a
+  second one would collide with.
+- **No log or screenshots on a console**, which have nowhere to go: a crash still shows on the
+  screen and goes to stdout. Under PCSX2 with the host filesystem on, `quake.log` lands next to the
+  image and the frame and I/O logs and screenshots under `id1/` there (`make iso run` links it to
+  the repo's). An `autoexec.cfg` on the disc runs as from any drive, which is how a test session
+  on a disc is scripted.
 
 ### Debugging
 
@@ -505,7 +563,7 @@ the hard disk (`hdd`), or under PCSX2 the host filesystem (`host`), in `id1/save
 Quake II port keeps them in `baseq2/save/`. Every device holds the same files: each of the menus'
 20 slots is one compressed file (an e1m1 save takes 11 KB), and a save is written in full before
 the one it replaces is deleted, so an interrupted save never loses the previous one. Loading reads
-the selected device only.
+the selected device only. A disc build saves to the card only, and has no Save Device row.
 
 Whenever the game reads or writes saved data (a save, a load, the save menus listing their slots,
 the settings), it shows the notice PS2 games show ([save_notice.h](src/ps2/save/save_notice.h)):
@@ -553,14 +611,14 @@ src/
     math/               vector/matrix math for the renderer
     net/                the network driver table (loopback only)
     save/               save games on the memory card or the boot drive
-    fs/                 compressed game packs (pakN.pkz) for QuakeSpasm's file system
+    fs/                 compressed game packs (pakN.pkz), the background loader, and the disc builds' CD/DVD device
     debug/              on-screen error printing, the log file, stack traces, EE exception handling
     menu/               the main menu's About page
     tests/              standalone bring-up scenes and tests
     builtin/            images compiled into the ELF (the QUAKE plaque, the main menu's About item, the palette), from imgdump
   tools/
     host/               host-side command line tools (unpak, imgdump, musenc, pakzip)
-    scripts/            Python helpers (symbolize, compile_commands.json, frame logs, the USB image, the About item) and make_github_release.sh
+    scripts/            Python helpers (symbolize, compile_commands.json, frame logs, the USB and disc images, the About item), make_github_release.sh and format_usb_drive.sh
     oxide-vcl/          VUSL and VCL compilers, for the VU microprograms (git submodule)
     miniz/              deflate codec for the save games, the compressed packs and pakzip (git submodule)
     vscode_extensions/  VUSL, VCL and VU assembly syntax highlighting for VSCode

@@ -185,6 +185,24 @@ The rest are scripted runs:
   `ps2_logfile 1` in the image's `autoexec.cfg`, and read what the run left with `hdiutil attach
   -readonly -nobrowse -mountpoint <dir> -imagekey diskimage-class=CRawDiskImage <image>`, then
   `hdiutil detach <dir>`. Edit the ini only with PCSX2 closed, and restore it after.
+- **Disc builds** (`make iso`, `make iso_dbg`; the Quake II port's testing-storage-boot.md has the
+  Quake II side): `make iso_dbg run` boots `build/iso_debug/quake.iso` as a disc (`PCSX2 -batch
+  -- <iso>`, `-fastboot` for a script). PCSX2 points `host:` at the image's directory, so
+  `quake.log` lands beside the image. A disc build saves and reads config.cfg on the card, so
+  back the card up first. **Script a session with the disc's own `autoexec.cfg`:**
+  `make iso_dbg ISO_DATA=<dir>` on a scratch `id1/` of file symlinks (make_iso.py follows a
+  linked file, but not a linked directory, so link `music/`'s files one by one) beside an
+  `autoexec.cfg`; the real `id1/` is never touched. First run (2026-11-22, debug, registered pkz
+  data and the .adp soundtrack, a 110 MiB image): mounted in 50 ms (16 files), game data at
+  126 ms, 1720 KB of IOP memory free; `ps2_logfile 1` and `ps2_testmaps 1` from the disc's
+  autoexec.cfg: 38 of 38 maps in 399 s, one every ~10.4 s with the 8 s dwell (~2.4 s a load at
+  PCSX2's emulated drive speed), heap peak 26.83 MB (0.17 MB under the last normal cycle's
+  27.00, the ELF 214 KB smaller), no texture evictions. The quit left the card unchanged (the
+  config was the same). The release image played the demo loop. The disc device's host harness
+  (the Quake II recipe, with `id1/` paths and a fake `ps2/system/sys.h`) passed on that image:
+  15 files, 98,148 checks. The user launched the release image from OPL on a console (USB, the
+  drive freshly formatted by format_usb_drive.sh) the same day: it works. Still owed: OPL from
+  the HDD or a share, OPL's VMC and PADEMU modes, and a perf capture from a disc.
 - **Compressed packs**: a scratch `id1/` of pkz symlinks and the map cycle, in a debug build, which
   checks the CRC of every file it reads from a pkz. `make pkz PAK_DIR=<dir>` on a directory of pak
   symlinks writes the pkz beside them, outside `id1/`. On 2026-10-18 the 9 shareware levels loaded

@@ -10,7 +10,7 @@
 
 #if PS2_QUAKE_IO_LOG
 
-#include "ps2/system/iop_boot.h" // SyncGameDataDevice, FileXioBufferBytes
+#include "ps2/system/iop_boot.h" // SyncGameDataDevice, FileXioBufferBytes, DebugOutputGamedir
 
 #include <cstdarg>
 #include <cstdio>
@@ -126,13 +126,16 @@ void WriteOut(const char * loadName)
     std::fputs(s_out, stdout);
     std::fflush(stdout);
 
-    if (s_fileFailed)
+    // A disc build has nowhere to write it on a console (ps2::sys::DebugOutputGamedir).
+    const char * const dir = ps2::sys::DebugOutputGamedir();
+    if (s_fileFailed || dir == nullptr)
     {
+        s_fileFailed = true;
         return;
     }
 
     char path[sizeof(com_gamedir) + sizeof("/io_log.txt")];
-    std::snprintf(path, sizeof(path), "%s/io_log.txt", com_gamedir);
+    std::snprintf(path, sizeof(path), "%s/io_log.txt", dir);
 
     const int flags = s_fileStarted ? O_WRONLY : (O_WRONLY | O_CREAT | O_TRUNC);
     const int fd    = open(path, flags, 0666);

@@ -1033,7 +1033,9 @@ enum
 //#endif
 	OPT_PS2SWAPSTICKS, // [PS2_QUAKE]: move with the right stick and look with the left, joy_swapmovelook
 	OPT_PS2RUMBLE, // [PS2_QUAKE]: the pad's vibration, in_rumble
+#if !PS2_QUAKE_ISO // [PS2_QUAKE]: a disc build saves to the memory card only, and has no such row
 	OPT_PS2SAVEDEVICE, // [PS2_QUAKE]: where saves go, host files or the memory card
+#endif
 	OPT_PS2DEBUG, // [PS2_QUAKE]: the backend's debugging aids, on the gamepad
 	OPT_VIDEO,	// This is the last before OPTIONS_ITEMS
 	OPTIONS_ITEMS
@@ -1181,9 +1183,11 @@ void M_AdjustSliders (int dir)
 		Cvar_SetValue ("in_rumble", !Cvar_VariableValue ("in_rumble"));
 		break;
 
+#if !PS2_QUAKE_ISO // [PS2_QUAKE]
 	case OPT_PS2SAVEDEVICE: // [PS2_QUAKE]
 		PS2_SaveDeviceToggle ();
 		break;
+#endif
 	}
 }
 
@@ -1313,9 +1317,11 @@ void M_Options_Draw (void)
 	M_Print (16, 32 + 8*OPT_PS2RUMBLE,	"                Rumble");
 	M_DrawCheckbox (220, 32 + 8*OPT_PS2RUMBLE, Cvar_VariableValue ("in_rumble") != 0);
 
+#if !PS2_QUAKE_ISO // [PS2_QUAKE]: a disc build has no Save Device row
 	// OPT_PS2SAVEDEVICE: [PS2_QUAKE]
 	M_Print (16, 32 + 8*OPT_PS2SAVEDEVICE,	"           Save Device");
 	M_Print (220, 32 + 8*OPT_PS2SAVEDEVICE, PS2_SaveDeviceName ());
+#endif
 
 	// OPT_PS2DEBUG: [PS2_QUAKE]
 	M_Print (16, 32 + 8*OPT_PS2DEBUG,	"         Debug Options");

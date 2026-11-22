@@ -20,7 +20,7 @@
 #include <cstdio>
 
 #if PS2_QUAKE_FRAME_LOG_FILE
-#include "ps2/system/iop_boot.h" // SyncGameDataDevice
+#include "ps2/system/iop_boot.h" // SyncGameDataDevice, DebugOutputGamedir
 #include <fcntl.h>
 #include <unistd.h>
 #endif // PS2_QUAKE_FRAME_LOG_FILE
@@ -228,10 +228,17 @@ void Commit()
 
     std::fputs(s_out, stdout);
 
+    // A disc build has nowhere to write it on a console (ps2::sys::DebugOutputGamedir).
+    const char * const dir = ps2::sys::DebugOutputGamedir();
+    if (dir == nullptr)
+    {
+        s_outFailed = true;
+    }
+
     if (!s_outFailed)
     {
         char path[sizeof(com_gamedir) + sizeof("/frame_log.txt")];
-        std::snprintf(path, sizeof(path), "%s/frame_log.txt", com_gamedir);
+        std::snprintf(path, sizeof(path), "%s/frame_log.txt", dir);
 
         const int flags = s_outStarted ? O_WRONLY : (O_WRONLY | O_CREAT | O_TRUNC);
         const int fd    = open(path, flags, 0666);

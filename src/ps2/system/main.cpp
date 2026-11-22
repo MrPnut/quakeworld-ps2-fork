@@ -88,8 +88,8 @@ int main(int argc, char ** argv)
     // data is found, which can take seconds on a console. It stays up until the game's first frame.
     ps2::splash::Show();
 
-    // Locate the game data - host: under PCSX2, USB mass: on a real console (which needs
-    // the IOP module bring-up) - before Host_Init, whose COM_InitFilesystem opens the pak
+    // Locate the game data - host: under PCSX2, the HDD or USB mass: on a real console (which
+    // needs the IOP module bring-up), the disc on a disc build - before Host_Init, whose COM_InitFilesystem opens the pak
     // files. A build with -DPS2_FS_BASE_PATH=\"...\" pins the base path and skips the
     // detection, for debugging.
 #ifdef PS2_FS_BASE_PATH
@@ -99,8 +99,9 @@ int main(int argc, char ** argv)
 #endif // PS2_FS_BASE_PATH
 
     // The log on the game data's drive (ps2_logfile), opening with what the boot found and did:
-    // the report's lines reached stdout as they happened, and go to the log alone.
-    ps2::debug::LogFileOpen(basedir);
+    // the report's lines reached stdout as they happened, and go to the log alone. A disc build's
+    // goes to the emulator's host:, or nowhere on a console (ps2::sys::DebugOutputBasePath).
+    ps2::debug::LogFileOpen(PS2_QUAKE_ISO ? ps2::sys::DebugOutputBasePath() : basedir, basedir);
     ps2::sys::PrintIopBootReport(&ps2::debug::LogFilePrintf);
 
     BuildArgv(argc, argv);

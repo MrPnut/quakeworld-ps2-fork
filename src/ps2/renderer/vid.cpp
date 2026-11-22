@@ -744,8 +744,15 @@ qboolean Image_WriteTGA(const char * name, byte * data, int width, int height, i
 {
     char pathname[MAX_OSPATH];
 
-    Sys_mkdir(com_gamedir); // a 'game' switched to a directory that does not exist yet
-    q_snprintf(pathname, sizeof(pathname), "%s/%s", com_gamedir, name);
+    // A disc build writes it to the emulator's host: filesystem, and has nowhere on a console.
+    const char * const gamedir = ps2::sys::DebugOutputGamedir();
+    if (gamedir == nullptr)
+    {
+        return false;
+    }
+
+    Sys_mkdir(gamedir); // a 'game' switched to a directory that does not exist yet
+    q_snprintf(pathname, sizeof(pathname), "%s/%s", gamedir, name);
 
     const int handle = Sys_FileOpenWrite(pathname);
     if (handle == -1)
