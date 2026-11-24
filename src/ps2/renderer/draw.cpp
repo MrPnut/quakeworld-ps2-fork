@@ -532,9 +532,9 @@ qpic_t * pic_ovr   = nullptr;
 // Pics
 // ------------------------------------------------------------------------------------------------
 
-qpic_t * Draw_PicFromWad(const char * name)
+qpic_t * Draw_PicFromWad(const char * picName)
 {
-    return PicFromWad(name);
+    return PicFromWad(picName);
 }
 
 qpic_t * Draw_CachePic(const char * path)
@@ -578,8 +578,7 @@ void Draw_NewGame()
     W_LoadWadFile();
     LoadPics();
     SCR_LoadPics();
-    Sbar_LoadPics();
-
+        
     for (int i = 0; i < s_numCachedPics; ++i)
     {
         FreePic(s_cachedPics[i].pic);
@@ -745,16 +744,16 @@ void GL_SetCanvas(canvastype newcanvas)
 
     case CANVAS_SBAR:
         s = Clamp(1.0f, scr_sbarscale.value, width / 320.0f);
-        if (cl.gametype == GAME_DEATHMATCH)
-        {
+        //if (cl.deathmatch)
+        //{
             SetCanvasTransform(0.0f, width / s, 48.0f, 0.0f, glx, gly, glwidth, ViewportInt(48.0f * s));
-        }
-        else
-        {
-            SetCanvasTransform(0.0f, 320.0f, 48.0f, 0.0f,
-                               ViewportInt(static_cast<float>(glx) + ((width - (320.0f * s)) / 2.0f)), gly,
-                               ViewportInt(320.0f * s), ViewportInt(48.0f * s));
-        }
+        //}
+        //else mrp double check
+        //{
+        //    SetCanvasTransform(0.0f, 320.0f, 48.0f, 0.0f,
+        //                       ViewportInt(static_cast<float>(glx) + ((width - (320.0f * s)) / 2.0f)), gly,
+        //                       ViewportInt(320.0f * s), ViewportInt(48.0f * s));
+        //}
         break;
 
     case CANVAS_WARPIMAGE:

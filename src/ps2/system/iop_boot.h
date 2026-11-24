@@ -96,4 +96,6 @@ bool StartSoundDriver();
 // The embedded usbd.irx (running already on a USB boot), then ps2kbd.irx, for libkbd.
 bool StartKeyboardDriver();
 
+bool StartNetworkDriver();
+
 } // namespace ps2::sys

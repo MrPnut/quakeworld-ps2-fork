@@ -417,7 +417,7 @@ void Sky_DrawSky (void);
 void Sky_NewMap (void);
 void Sky_LoadTexture (qmodel_t *m, texture_t *mt);
 void Sky_LoadTextureQ64 (qmodel_t *m, texture_t *mt);
-void Sky_LoadSkyBox (const char *name);
+void Sky_LoadSkyBox (const char *skyboxName);
 
 void TexMgr_RecalcWarpImageSize (void);
 

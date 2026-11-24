@@ -1061,11 +1061,11 @@ void PS2_PkzListFiles(ps2_pkz_t * pkz, const ps2_pkz_file_fn fn, void * context)
         const u8 * const h = pkz->dir + pkz->dirHeaderOfs[i];
         const u32 nameLen = pkz::ReadU16(h + pkz::kCentralNameLenOfs);
 
-        char name[MAX_QPATH];
-        std::memcpy(name, h + pkz::kCentralHeaderBytes, nameLen); // < MAX_QPATH, checked at open
-        name[nameLen] = '\0';
+        char entryName[MAX_QPATH];
+        std::memcpy(entryName, h + pkz::kCentralHeaderBytes, nameLen); // < MAX_QPATH, checked at open
+        entryName[nameLen] = '\0';
 
-        fn(context, i, name, static_cast<int>(pkz->entries[i].rawBytes));
+        fn(context, i, entryName, static_cast<int>(pkz->entries[i].rawBytes));
     }
 
     ps2::heap::Free(pkz->dir, pkz->dirBytes, MemTag::Pack);
@@ -1074,19 +1074,19 @@ void PS2_PkzListFiles(ps2_pkz_t * pkz, const ps2_pkz_file_fn fn, void * context)
     pkz->dirHeaderOfs = nullptr;
 }
 
-int PS2_PkzOpenHandle(ps2_pkz_t * pkz, const int index, const char * name)
+int PS2_PkzOpenHandle(ps2_pkz_t * pkz, const int index, const char * entryName)
 {
-    std::FILE * const file = OpenEntryStream(*pkz, index, name, StreamUse::Handle);
+    std::FILE * const file = OpenEntryStream(*pkz, index, entryName, StreamUse::Handle);
     if (file == nullptr) [[unlikely]]
     {
-        Sys_Error("Couldn't open %s in %s: the pack is damaged there.", name, pkz->path);
+        Sys_Error("Couldn't open %s in %s: the pack is damaged there.", entryName, pkz->path);
     }
     return ps2::sys::OpenFileHandle(file);
 }
 
-std::FILE * PS2_PkzOpenStream(ps2_pkz_t * pkz, const int index, const char * name)
+std::FILE * PS2_PkzOpenStream(ps2_pkz_t * pkz, const int index, const char * entryName)
 {
-    return OpenEntryStream(*pkz, index, name, StreamUse::Stdio);
+    return OpenEntryStream(*pkz, index, entryName, StreamUse::Stdio);
 }
 
 int PS2_PkzLocate(ps2_pkz_t * pkz, const int index, int * fd, unsigned * offset, unsigned * compBytes,

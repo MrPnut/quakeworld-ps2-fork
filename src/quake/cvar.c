@@ -424,8 +424,20 @@ void Cvar_SetQuick (cvar_t *var, const char *value)
 	}
 	//johnfitz
 
+	if (var->flags & CVAR_USERINFO)
+	{
+		Info_SetValueForKey (cls.userinfo, var->name, var->string, MAX_INFO_STRING);
+		if (cls.state >= ca_connected)
+		{
+			MSG_WriteByte (&cls.netchan.message, clc_stringcmd);
+			MSG_WriteStringf (&cls.netchan.message, "setinfo \"%s\" \"%s\"\n", var->name, var->string);
+		}
+	}
+
 	if (var->callback)
+	{
 		var->callback (var);
+	}
 }
 
 void Cvar_SetValueQuick (cvar_t *var, const float value)

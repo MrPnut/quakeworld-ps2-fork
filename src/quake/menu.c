@@ -38,7 +38,6 @@ void M_Menu_Main_f (void);
 		void M_Menu_Setup_f (void);
 		void M_Menu_Net_f (void);
 		void M_Menu_LanConfig_f (void);
-		void M_Menu_GameOptions_f (void);
 		void M_Menu_Search_f (void);
 		void M_Menu_ServerList_f (void);
 	void M_Menu_Options_f (void);
@@ -95,6 +94,11 @@ char		m_return_reason [32];
 #define	TCPIPConfig		(m_net_cursor == 1)
 
 void M_ConfigureNetSubsystem(void);
+
+extern cvar_t name;
+extern cvar_t topcolor;
+extern cvar_t bottomcolor;
+extern cvar_t cl_alwaysrun;
 
 /*
 ================
@@ -291,8 +295,6 @@ void M_Main_Key (int key)
 		key_dest = key_game;
 		m_state = m_none;
 		cls.demonum = m_save_demonum;
-		if (!fitzmode && !cl_startdemos.value)	/* QuakeSpasm customization: */
-			break;
 		if (cls.demonum != -1 && !cls.demoplayback && cls.state != ca_connected)
 			CL_NextDemo ();
 		break;
@@ -405,14 +407,15 @@ void M_SinglePlayer_Key (int key)
 		switch (m_singleplayer_cursor)
 		{
 		case 0:
-			if (sv.active)
+			// mrp
+			// if (sv.active)
 				// [PS2_QUAKE]: the pad's buttons in place of the keyboard's y and n
-				if (!SCR_ModalMessage("Are you sure you want to\nstart a new game?\n\nCross: yes   Circle: no\n", 0.0f))
-					break;
+			//	if (!SCR_ModalMessage("Are you sure you want to\nstart a new game?\n\nCross: yes   Circle: no\n", 0.0f))
+			//		break;
 			IN_Activate();
 			key_dest = key_game;
-			if (sv.active)
-				Cbuf_AddText ("disconnect\n");
+			// mrp if (sv.active)
+			//	Cbuf_AddText ("disconnect\n");
 			Cbuf_AddText ("maxplayers 1\n");
 			Cbuf_AddText ("deathmatch 0\n"); //johnfitz
 			Cbuf_AddText ("coop 0\n"); //johnfitz
@@ -481,12 +484,12 @@ void M_Menu_Load_f (void)
 
 void M_Menu_Save_f (void)
 {
-	if (!sv.active)
-		return;
+	// mrp if (!sv.active)
+	//	return;
 	if (cl.intermission)
 		return;
-	if (svs.maxclients != 1)
-		return;
+	// mrp if (svs.maxclients != 1)
+	//	return;
 	m_entersound = true;
 	m_state = m_save;
 
@@ -660,12 +663,8 @@ void M_MultiPlayer_Draw (void)
 	f = (int)(realtime * 10)%6;
 
 	M_DrawTransPic (54, 32 + m_multiplayer_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 ) ) );
-
-	if (ipxAvailable || tcpipAvailable)
-		return;
 	M_PrintWhite ((320/2) - ((27*8)/2), 148, "No Communications Available");
 }
-
 
 void M_MultiPlayer_Key (int key)
 {
@@ -695,13 +694,9 @@ void M_MultiPlayer_Key (int key)
 		switch (m_multiplayer_cursor)
 		{
 		case 0:
-			if (ipxAvailable || tcpipAvailable)
-				M_Menu_Net_f ();
 			break;
 
 		case 1:
-			if (ipxAvailable || tcpipAvailable)
-				M_Menu_Net_f ();
 			break;
 
 		case 2:
@@ -732,10 +727,10 @@ void M_Menu_Setup_f (void)
 	key_dest = key_menu;
 	m_state = m_setup;
 	m_entersound = true;
-	Q_strcpy(setup_myname, cl_name.string);
-	Q_strcpy(setup_hostname, hostname.string);
-	setup_top = setup_oldtop = ((int)cl_color.value) >> 4;
-	setup_bottom = setup_oldbottom = ((int)cl_color.value) & 15;
+	q_strlcpy(setup_myname, name.string, sizeof(setup_myname));
+// mrp	Q_strcpy(setup_hostname, hostname.string);
+	setup_top = setup_oldtop = (int)topcolor.value;
+	setup_bottom = setup_oldbottom = (int)bottomcolor.value;
 }
 
 
@@ -828,13 +823,23 @@ forward:
 		if (setup_cursor == 2 || setup_cursor == 3)
 			goto forward;
 
-		// setup_cursor == 4 (OK)
-		if (Q_strcmp(cl_name.string, setup_myname) != 0)
-			Cbuf_AddText ( va ("name \"%s\"\n", setup_myname) );
-		if (Q_strcmp(hostname.string, setup_hostname) != 0)
-			Cvar_Set("hostname", setup_hostname);
+		if (Q_strcmp(name.string, setup_myname) != 0)
+		{
+			Cvar_Set("name", setup_myname);
+		}
+    	
+		// mrp
+		//if (Q_strcmp(hostname.string, setup_hostname) != 0)
+		//{
+	    //	Cvar_Set("hostname", setup_hostname);
+		//}
+			
 		if (setup_top != setup_oldtop || setup_bottom != setup_oldbottom)
-			Cbuf_AddText( va ("color %i %i\n", setup_top, setup_bottom) );
+		{
+			Cvar_SetValue("topcolor", setup_top);
+			Cvar_SetValue("bottomcolor", setup_bottom);
+		}
+			
 		m_entersound = true;
 		M_Menu_MultiPlayer_f ();
 		break;
@@ -942,17 +947,12 @@ void M_Net_Draw (void)
 
 	f = 32;
 
-	if (ipxAvailable)
-		p = Draw_CachePic ("gfx/netmen3.lmp");
-	else
-		p = Draw_CachePic ("gfx/dim_ipx.lmp");
+	p = Draw_CachePic ("gfx/dim_ipx.lmp");
 	M_DrawTransPic (72, f, p);
 
 	f += 19;
-	if (tcpipAvailable)
-		p = Draw_CachePic ("gfx/netmen4.lmp");
-	else
-		p = Draw_CachePic ("gfx/dim_tcp.lmp");
+	
+	p = Draw_CachePic ("gfx/dim_tcp.lmp");
 	M_DrawTransPic (72, f, p);
 
 	f = (320-26*8)/2;
@@ -998,10 +998,10 @@ again:
 		break;
 	}
 
-	if (m_net_cursor == 0 && !ipxAvailable)
+	if (m_net_cursor == 0 || m_net_cursor == 1)
+	{
 		goto again;
-	if (m_net_cursor == 1 && !tcpipAvailable)
-		goto again;
+	}
 }
 
 //=============================================================================
@@ -1746,7 +1746,8 @@ void M_Quit_Char (int key)
 	case 'Y':
 		IN_Deactivate(modestate == MS_WINDOWED);
 		key_dest = key_console;
-		Host_Quit_f ();
+		CL_Disconnect();
+		Sys_Quit();
 		break;
 
 	default:
@@ -1815,7 +1816,6 @@ void M_Menu_LanConfig_f (void)
 	}
 	if (StartingGame && lanConfig_cursor == 2)
 		lanConfig_cursor = 1;
-	lanConfig_port = DEFAULTnet_hostport;
 	sprintf(lanConfig_portname, "%u", lanConfig_port);
 
 	m_return_onerror = false;
@@ -1849,11 +1849,7 @@ void M_LanConfig_Draw (void)
 	basex += 8;
 
 	M_Print (basex, 52, "Address:");
-	if (IPXConfig)
-		M_Print (basex+9*8, 52, my_ipx_address);
-	else
-		M_Print (basex+9*8, 52, my_tcpip_address);
-
+	
 	M_Print (basex, lanConfig_cursor_table[0], "Port");
 	M_DrawTextBox (basex+8*8, lanConfig_cursor_table[0]-8, 6, 1);
 	M_Print (basex+9*8, lanConfig_cursor_table[0], lanConfig_portname);
@@ -1922,8 +1918,7 @@ void M_LanConfig_Key (int key)
 		if (lanConfig_cursor == 1)
 		{
 			if (StartingGame)
-			{
-				M_Menu_GameOptions_f ();
+			{				
 				break;
 			}
 			M_Menu_Search_f();
@@ -2161,306 +2156,9 @@ int maxplayers;
 qboolean m_serverInfoMessage = false;
 double m_serverInfoMessageTime;
 
-void M_Menu_GameOptions_f (void)
-{
-	IN_Deactivate(modestate == MS_WINDOWED);
-	key_dest = key_menu;
-	m_state = m_gameoptions;
-	m_entersound = true;
-	if (maxplayers == 0)
-		maxplayers = svs.maxclients;
-	if (maxplayers < 2)
-		maxplayers = svs.maxclientslimit;
-}
-
-
 int gameoptions_cursor_table[] = {40, 56, 64, 72, 80, 88, 96, 112, 120};
 #define	NUM_GAMEOPTIONS	9
 int		gameoptions_cursor;
-
-void M_GameOptions_Draw (void)
-{
-	qpic_t	*p;
-	int		x;
-
-	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
-	p = Draw_CachePic ("gfx/p_multi.lmp");
-	M_DrawPic ( (320-p->width)/2, 4, p);
-
-	M_DrawTextBox (152, 32, 10, 1);
-	M_Print (160, 40, "begin game");
-
-	M_Print (0, 56, "      Max players");
-	M_Print (160, 56, va("%i", maxplayers) );
-
-	M_Print (0, 64, "        Game Type");
-	if (coop.value)
-		M_Print (160, 64, "Cooperative");
-	else
-		M_Print (160, 64, "Deathmatch");
-
-	M_Print (0, 72, "        Teamplay");
-	if (rogue)
-	{
-		const char *msg;
-
-		switch((int)teamplay.value)
-		{
-			case 1: msg = "No Friendly Fire"; break;
-			case 2: msg = "Friendly Fire"; break;
-			case 3: msg = "Tag"; break;
-			case 4: msg = "Capture the Flag"; break;
-			case 5: msg = "One Flag CTF"; break;
-			case 6: msg = "Three Team CTF"; break;
-			default: msg = "Off"; break;
-		}
-		M_Print (160, 72, msg);
-	}
-	else
-	{
-		const char *msg;
-
-		switch((int)teamplay.value)
-		{
-			case 1: msg = "No Friendly Fire"; break;
-			case 2: msg = "Friendly Fire"; break;
-			default: msg = "Off"; break;
-		}
-		M_Print (160, 72, msg);
-	}
-
-	M_Print (0, 80, "            Skill");
-	if (skill.value == 0)
-		M_Print (160, 80, "Easy difficulty");
-	else if (skill.value == 1)
-		M_Print (160, 80, "Normal difficulty");
-	else if (skill.value == 2)
-		M_Print (160, 80, "Hard difficulty");
-	else
-		M_Print (160, 80, "Nightmare difficulty");
-
-	M_Print (0, 88, "       Frag Limit");
-	if (fraglimit.value == 0)
-		M_Print (160, 88, "none");
-	else
-		M_Print (160, 88, va("%i frags", (int)fraglimit.value));
-
-	M_Print (0, 96, "       Time Limit");
-	if (timelimit.value == 0)
-		M_Print (160, 96, "none");
-	else
-		M_Print (160, 96, va("%i minutes", (int)timelimit.value));
-
-	M_Print (0, 112, "         Episode");
-	// MED 01/06/97 added hipnotic episodes
-	if (hipnotic)
-		M_Print (160, 112, hipnoticepisodes[startepisode].description);
-	// PGM 01/07/97 added rogue episodes
-	else if (rogue)
-		M_Print (160, 112, rogueepisodes[startepisode].description);
-	else
-		M_Print (160, 112, episodes[startepisode].description);
-
-	M_Print (0, 120, "           Level");
-	// MED 01/06/97 added hipnotic episodes
-	if (hipnotic)
-	{
-		M_Print (160, 120, hipnoticlevels[hipnoticepisodes[startepisode].firstLevel + startlevel].description);
-		M_Print (160, 128, hipnoticlevels[hipnoticepisodes[startepisode].firstLevel + startlevel].name);
-	}
-	// PGM 01/07/97 added rogue episodes
-	else if (rogue)
-	{
-		M_Print (160, 120, roguelevels[rogueepisodes[startepisode].firstLevel + startlevel].description);
-		M_Print (160, 128, roguelevels[rogueepisodes[startepisode].firstLevel + startlevel].name);
-	}
-	else
-	{
-		M_Print (160, 120, levels[episodes[startepisode].firstLevel + startlevel].description);
-		M_Print (160, 128, levels[episodes[startepisode].firstLevel + startlevel].name);
-	}
-
-// line cursor
-	M_DrawCharacter (144, gameoptions_cursor_table[gameoptions_cursor], 12+((int)(realtime*4)&1));
-
-	if (m_serverInfoMessage)
-	{
-		if ((realtime - m_serverInfoMessageTime) < 5.0)
-		{
-			x = (320-26*8)/2;
-			M_DrawTextBox (x, 138, 24, 4);
-			x += 8;
-			M_Print (x, 146, "  More than 4 players   ");
-			M_Print (x, 154, " requires using command ");
-			M_Print (x, 162, "line parameters; please ");
-			M_Print (x, 170, "   see techinfo.txt.    ");
-		}
-		else
-		{
-			m_serverInfoMessage = false;
-		}
-	}
-}
-
-
-void M_NetStart_Change (int dir)
-{
-	int count;
-	float	f;
-
-	switch (gameoptions_cursor)
-	{
-	case 1:
-		maxplayers += dir;
-		if (maxplayers > svs.maxclientslimit)
-		{
-			maxplayers = svs.maxclientslimit;
-			m_serverInfoMessage = true;
-			m_serverInfoMessageTime = realtime;
-		}
-		if (maxplayers < 2)
-			maxplayers = 2;
-		break;
-
-	case 2:
-		Cvar_Set ("coop", coop.value ? "0" : "1");
-		break;
-
-	case 3:
-		count = (rogue) ? 6 : 2;
-		f = teamplay.value + dir;
-		if (f > count)	f = 0;
-		else if (f < 0)	f = count;
-		Cvar_SetValue ("teamplay", f);
-		break;
-
-	case 4:
-		f = skill.value + dir;
-		if (f > 3)	f = 0;
-		else if (f < 0)	f = 3;
-		Cvar_SetValue ("skill", f);
-		break;
-
-	case 5:
-		f = fraglimit.value + dir * 10;
-		if (f > 100)	f = 0;
-		else if (f < 0)	f = 100;
-		Cvar_SetValue ("fraglimit", f);
-		break;
-
-	case 6:
-		f = timelimit.value + dir * 5;
-		if (f > 60)	f = 0;
-		else if (f < 0)	f = 60;
-		Cvar_SetValue ("timelimit", f);
-		break;
-
-	case 7:
-		startepisode += dir;
-	//MED 01/06/97 added hipnotic count
-		if (hipnotic)
-			count = 6;
-	//PGM 01/07/97 added rogue count
-	//PGM 03/02/97 added 1 for dmatch episode
-		else if (rogue)
-			count = 4;
-		else if (registered.value)
-			count = 7;
-		else
-			count = 2;
-
-		if (startepisode < 0)
-			startepisode = count - 1;
-
-		if (startepisode >= count)
-			startepisode = 0;
-
-		startlevel = 0;
-		break;
-
-	case 8:
-		startlevel += dir;
-	//MED 01/06/97 added hipnotic episodes
-		if (hipnotic)
-			count = hipnoticepisodes[startepisode].levels;
-	//PGM 01/06/97 added hipnotic episodes
-		else if (rogue)
-			count = rogueepisodes[startepisode].levels;
-		else
-			count = episodes[startepisode].levels;
-
-		if (startlevel < 0)
-			startlevel = count - 1;
-
-		if (startlevel >= count)
-			startlevel = 0;
-		break;
-	}
-}
-
-void M_GameOptions_Key (int key)
-{
-	switch (key)
-	{
-	case K_ESCAPE:
-	case K_BBUTTON:
-		M_Menu_Net_f ();
-		break;
-
-	case K_UPARROW:
-		S_LocalSound ("misc/menu1.wav");
-		gameoptions_cursor--;
-		if (gameoptions_cursor < 0)
-			gameoptions_cursor = NUM_GAMEOPTIONS-1;
-		break;
-
-	case K_DOWNARROW:
-		S_LocalSound ("misc/menu1.wav");
-		gameoptions_cursor++;
-		if (gameoptions_cursor >= NUM_GAMEOPTIONS)
-			gameoptions_cursor = 0;
-		break;
-
-	case K_LEFTARROW:
-		if (gameoptions_cursor == 0)
-			break;
-		S_LocalSound ("misc/menu3.wav");
-		M_NetStart_Change (-1);
-		break;
-
-	case K_RIGHTARROW:
-		if (gameoptions_cursor == 0)
-			break;
-		S_LocalSound ("misc/menu3.wav");
-		M_NetStart_Change (1);
-		break;
-
-	case K_ENTER:
-	case K_KP_ENTER:
-	case K_ABUTTON:
-		S_LocalSound ("misc/menu2.wav");
-		if (gameoptions_cursor == 0)
-		{
-			if (sv.active)
-				Cbuf_AddText ("disconnect\n");
-			Cbuf_AddText ("listen 0\n");	// so host_netport will be re-examined
-			Cbuf_AddText ( va ("maxplayers %u\n", maxplayers) );
-			SCR_BeginLoadingPlaque ();
-
-			if (hipnotic)
-				Cbuf_AddText ( va ("map %s\n", hipnoticlevels[hipnoticepisodes[startepisode].firstLevel + startlevel].name) );
-			else if (rogue)
-				Cbuf_AddText ( va ("map %s\n", roguelevels[rogueepisodes[startepisode].firstLevel + startlevel].name) );
-			else
-				Cbuf_AddText ( va ("map %s\n", levels[episodes[startepisode].firstLevel + startlevel].name) );
-
-			return;
-		}
-
-		M_NetStart_Change (1);
-		break;
-	}
-}
 
 //=============================================================================
 /* SEARCH MENU */
@@ -2474,13 +2172,8 @@ void M_Menu_Search_f (void)
 	key_dest = key_menu;
 	m_state = m_search;
 	m_entersound = false;
-	slistSilent = true;
-	slistLocal = false;
 	searchComplete = false;
-	NET_Slist_f();
-
 }
-
 
 void M_Search_Draw (void)
 {
@@ -2493,22 +2186,10 @@ void M_Search_Draw (void)
 	M_DrawTextBox (x-8, 32, 12, 1);
 	M_Print (x, 40, "Searching...");
 
-	if(slistInProgress)
-	{
-		NET_Poll();
-		return;
-	}
-
 	if (! searchComplete)
 	{
 		searchComplete = true;
 		searchCompleteTime = realtime;
-	}
-
-	if (hostCacheCount)
-	{
-		M_Menu_ServerList_f ();
-		return;
 	}
 
 	M_PrintWhite ((320/2) - ((22*8)/2), 64, "No Quake servers found");
@@ -2544,19 +2225,15 @@ void M_Menu_ServerList_f (void)
 
 void M_ServerList_Draw (void)
 {
-	int	n;
 	qpic_t	*p;
 
 	if (!slist_sorted)
 	{
 		slist_sorted = true;
-		NET_SlistSort ();
 	}
 
 	p = Draw_CachePic ("gfx/p_multi.lmp");
 	M_DrawPic ( (320-p->width)/2, 4, p);
-	for (n = 0; n < hostCacheCount; n++)
-		M_Print (16, 32 + 8*n, NET_SlistPrintServer (n));
 	M_DrawCharacter (0, 32 + slist_cursor*8, 12+((int)(realtime*4)&1));
 
 	if (*m_return_reason)
@@ -2580,17 +2257,12 @@ void M_ServerList_Key (int k)
 	case K_UPARROW:
 	case K_LEFTARROW:
 		S_LocalSound ("misc/menu1.wav");
-		slist_cursor--;
-		if (slist_cursor < 0)
-			slist_cursor = hostCacheCount - 1;
 		break;
 
 	case K_DOWNARROW:
 	case K_RIGHTARROW:
 		S_LocalSound ("misc/menu1.wav");
 		slist_cursor++;
-		if (slist_cursor >= hostCacheCount)
-			slist_cursor = 0;
 		break;
 
 	case K_ENTER:
@@ -2603,7 +2275,6 @@ void M_ServerList_Key (int k)
 		IN_Activate();
 		key_dest = key_game;
 		m_state = m_none;
-		Cbuf_AddText ( va ("connect \"%s\"\n", NET_SlistPrintServerName(slist_cursor)) );
 		break;
 
 	default:
@@ -2731,7 +2402,7 @@ void M_Draw (void)
 		break;
 
 	case m_gameoptions:
-		M_GameOptions_Draw ();
+		//M_GameOptions_Draw ();
 		break;
 
 	case m_search:
@@ -2821,7 +2492,7 @@ void M_Keydown (int key)
 		return;
 
 	case m_gameoptions:
-		M_GameOptions_Key (key);
+		//M_GameOptions_Key (key);
 		return;
 
 	case m_search:
@@ -2882,8 +2553,4 @@ void M_ConfigureNetSubsystem(void)
 {
 // enable/disable net systems to match desired config
 	Cbuf_AddText ("stopdemo\n");
-
-	if (IPXConfig || TCPIPConfig)
-		net_hostport = lanConfig_port;
 }
-

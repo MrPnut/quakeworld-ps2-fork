@@ -584,7 +584,7 @@ void TexMgr_Init()
     nulltexture = TexMgr_LoadImage(nullptr, "nulltexture", 2, 2, SRC_RGBA, nullptr, "", 0, TEXPREF_PERSIST);
 }
 
-gltexture_t * TexMgr_LoadImage(qmodel_t * owner, const char * name, int width, int height,
+gltexture_t * TexMgr_LoadImage(qmodel_t * owner, const char * texName, int width, int height,
                                enum srcformat format, byte * data, const char * source_file,
                                src_offset_t source_offset, unsigned flags)
 {
@@ -595,7 +595,7 @@ gltexture_t * TexMgr_LoadImage(qmodel_t * owner, const char * name, int width, i
     {
         for (gltexture_t * t = s_textures; t != nullptr; t = t->next)
         {
-            if (t->owner == owner && std::strcmp(t->name, name) == 0)
+            if (t->owner == owner && std::strcmp(t->name, texName) == 0)
             {
                 texture = t;
                 ps2::rs::FinishFrameInFlight();
@@ -606,11 +606,11 @@ gltexture_t * TexMgr_LoadImage(qmodel_t * owner, const char * name, int width, i
     }
     if (texture == nullptr)
     {
-        texture = NewTexture(name);
+        texture = NewTexture(texName);
     }
 
     texture->owner = owner;
-    q_strlcpy(texture->name, name, sizeof(texture->name));
+    q_strlcpy(texture->name, texName, sizeof(texture->name));
     texture->width         = static_cast<unsigned int>(width);
     texture->height        = static_cast<unsigned int>(height);
     texture->flags         = flags;

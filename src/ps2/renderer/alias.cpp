@@ -379,8 +379,8 @@ void SetupEntityTransform(entity_t & e, const float now, LerpData & lerp)
 Q_ALWAYS_INLINE bool IsPlayerEntity(const entity_t & e)
 {
     const uintptr_t address = reinterpret_cast<uintptr_t>(&e);
-    return address >= reinterpret_cast<uintptr_t>(&cl_entities[1]) &&
-           address <= reinterpret_cast<uintptr_t>(&cl_entities[cl.maxclients]);
+    return address >= reinterpret_cast<uintptr_t>(&cl_player_entities[0]) &&
+           address <  reinterpret_cast<uintptr_t>(&cl_player_entities[MAX_CLIENTS]);
 }
 
 // Raises a light so its three channels sum to at least 'minimum'.
@@ -642,7 +642,7 @@ void DrawAliasModel(entity_t & e, const bool viewModel)
     const gltexture_t * glow = (gl_fullbrights.value != 0.0f) ? hdr.fbtextures[skinnum][anim] : nullptr;
     if (e.colormap != vid.colormap && gl_nocolors.value == 0.0f && IsPlayerEntity(e))
     {
-        const gltexture_t * const colored = playertextures[&e - cl_entities - 1];
+        const gltexture_t * const colored = playertextures[&e - cl_player_entities];
         if (colored != nullptr)
         {
             skin = colored;
@@ -852,8 +852,8 @@ void GLMesh_DeleteVertexBuffers()
 // New colours for a player: their skin texture translated again.
 void R_TranslatePlayerSkin(int playernum)
 {
-    const int top    = (cl.scores[playernum].colors & 0xf0) >> 4;
-    const int bottom = cl.scores[playernum].colors & 15;
+    const int top    = cl.players[playernum].topcolor;
+    const int bottom = cl.players[playernum].bottomcolor;
 
     if (gl_nocolors.value == 0.0f && playertextures[playernum] != nullptr)
     {
@@ -865,7 +865,7 @@ void R_TranslatePlayerSkin(int playernum)
 // translated. Called when the skin or the model actually changes, not just the colours.
 void R_TranslateNewPlayerSkin(int playernum)
 {
-    entity_t & e = cl_entities[1 + playernum];
+    entity_t & e = cl_player_entities[playernum];
     if (e.model == nullptr || e.model->type != mod_alias)
     {
         return;
@@ -883,9 +883,9 @@ void R_TranslateNewPlayerSkin(int playernum)
     // The 8-bit skin the model loader kept for this, in the model's cache block: read at once.
     byte * const pixels = static_cast<byte *>(static_cast<void *>(hdr)) + hdr->texels[skinnum];
 
-    char name[64];
-    q_snprintf(name, sizeof(name), "player_%i", playernum);
-    playertextures[playernum] = TexMgr_LoadImage(e.model, name, hdr->skinwidth, hdr->skinheight, SRC_INDEXED,
+    char playerName[64];
+    q_snprintf(playerName, sizeof(playerName), "player_%i", playernum);
+    playertextures[playernum] = TexMgr_LoadImage(e.model, playerName, hdr->skinwidth, hdr->skinheight, SRC_INDEXED,
                                                  pixels, hdr->gltextures[skinnum][0]->source_file,
                                                  hdr->gltextures[skinnum][0]->source_offset,
                                                  TEXPREF_PAD | TEXPREF_OVERWRITE);

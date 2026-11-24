@@ -178,7 +178,7 @@ void R_ReadPointFile_f (void)
 	if (cls.state != ca_connected)
 		return;			// need an active map.
 
-	q_snprintf (name, sizeof(name), "maps/%s.pts", cl.mapname);
+	q_snprintf (name, sizeof(name), "maps/%s.pts", Info_ValueForKey (cl.serverinfo, "map"));
 
 	COM_FOpenFile (name, &f, NULL);
 	if (!f)
@@ -231,7 +231,7 @@ void R_ParseParticleEffect (void)
 	int			i, count, msgcount, color;
 
 	for (i=0 ; i<3 ; i++)
-		org[i] = MSG_ReadCoord (cl.protocolflags);
+		org[i] = MSG_ReadCoord ();
 	for (i=0 ; i<3 ; i++)
 		dir[i] = MSG_ReadChar () * (1.0/16);
 	msgcount = MSG_ReadByte ();
@@ -628,17 +628,17 @@ void CL_RunParticles (void)
 	particle_t		*p, *kill;
 	int				i;
 	float			time1, time2, time3, dvel, frametime, grav;
-	float			now; // [PS2_QUAKE]: cl.time, read once (below)
-	extern	cvar_t	sv_gravity;
+	float			now; // [PS2_QUAKE]: cl.time, read once (below)	
 
-	frametime = cl.time - cl.oldtime;
+	frametime = host_frametime;
+
 	// [PS2_QUAKE]: the particles' die times are float. Compared with the double cl.time, each test
 	// was a soft-float call per particle per frame - the most of any site in the client.
 	now = cl.time;
 	time3 = frametime * 15;
 	time2 = frametime * 10;
 	time1 = frametime * 5;
-	grav = frametime * sv_gravity.value * 0.05;
+	grav = frametime * movevars.gravity * 0.05;
 	dvel = 4*frametime;
 
 	for ( ;; )

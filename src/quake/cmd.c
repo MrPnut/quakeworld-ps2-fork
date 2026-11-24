@@ -42,6 +42,8 @@ cmdalias_t	*cmd_alias;
 
 qboolean	cmd_wait;
 
+cvar_t cl_warncmd = { "cl_warncmd", "0" };
+
 //=============================================================================
 
 /*
@@ -287,7 +289,11 @@ void Cmd_Exec_f (void)
 		Con_Printf ("couldn't exec %s\n",Cmd_Argv(1));
 		return;
 	}
-	Con_Printf ("execing %s\n",Cmd_Argv(1));
+
+	if (cl_warncmd.value || developer.value)
+	{
+		Con_Printf ("execing %s\n",Cmd_Argv(1));
+	}		
 
 	// [PS2_QUAKE]: the PS2's additions to the defaults (the gamepad's binds, always run) run
 	// right after default.cfg. Cbuf_InsertText puts its text first in line, so they go in first.
@@ -818,12 +824,12 @@ void	Cmd_ExecuteString (const char *text, cmd_source_t src)
 			return;
 		}
 	}
-
-// check cvars
-	if (!Cvar_Command ())
-		Con_Printf ("Unknown command \"%s\"\n", Cmd_Argv(0));
+	
+	if (!Cvar_Command() && (cl_warncmd.value || developer.value))
+	{
+		Con_Printf("Unknown command \"%s\"\n", Cmd_Argv(0));
+	}
 }
-
 
 /*
 ===================
@@ -834,25 +840,33 @@ Sends the entire command line over to the server
 */
 void Cmd_ForwardToServer (void)
 {
-	if (cls.state != ca_connected)
+	if (cls.state < ca_connected)
 	{
 		Con_Printf ("Can't \"%s\", not connected\n", Cmd_Argv(0));
+
 		return;
 	}
 
 	if (cls.demoplayback)
-		return;		// not really connected
-
-	MSG_WriteByte (&cls.message, clc_stringcmd);
+	{
+		return;
+	}
+		
+	MSG_WriteByte (&cls.netchan.message, clc_stringcmd);
 	if (q_strcasecmp(Cmd_Argv(0), "cmd") != 0)
 	{
-		SZ_Print (&cls.message, Cmd_Argv(0));
-		SZ_Print (&cls.message, " ");
+		SZ_Print (&cls.netchan.message, Cmd_Argv(0));
+		SZ_Print (&cls.netchan.message, " ");
 	}
+
 	if (Cmd_Argc() > 1)
-		SZ_Print (&cls.message, Cmd_Args());
+	{
+		SZ_Print (&cls.netchan.message, Cmd_Args());
+	}
 	else
-		SZ_Print (&cls.message, "\n");
+	{
+		SZ_Print (&cls.netchan.message, "\n");
+	}
 }
 
 

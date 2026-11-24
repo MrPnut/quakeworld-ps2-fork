@@ -500,7 +500,10 @@ typedef struct qmodel_s
 
 //
 // additional model data
-//
+//	
+	unsigned checksum;
+	unsigned checksum2;
+
 	cache_user_t	cache;		// only access through Mod_Extradata
 
 } qmodel_t;

@@ -487,8 +487,10 @@ static wad_t *Mod_LoadWadFiles (qmodel_t *mod)
 		return NULL;
 
 	// disregard if this isn't the world model
-	if (strcmp (mod->name, sv.modelname))
+	if (mod->name[0] == '*')
+	{
 		return NULL;
+	}
 
 	data = COM_Parse (mod->entities);
 	if (!data)
@@ -2520,7 +2522,30 @@ static void Mod_LoadBrushModel (qmodel_t *mod, void *buffer)
 	for (i = 0; i < (int) sizeof(dheader_t) / 4; i++)
 		((int *)header)[i] = LittleLong ( ((int *)header)[i]);
 
-// load into heap
+		for (i = 0; i < (int) sizeof(dheader_t) / 4; i++)
+		((int *)header)[i] = LittleLong ( ((int *)header)[i]);
+
+	mod->checksum = 0;
+	mod->checksum2 = 0;
+
+	for (i = 0; i < HEADER_LUMPS; i++) {
+		unsigned int checksum;
+		const lump_t *headerlump = &header->lumps[i];
+		const byte *data = (byte *)header + headerlump->fileofs;
+
+		/* exclude entities from both checksums */
+		if (i == LUMP_ENTITIES)
+			continue;
+		checksum = Com_BlockChecksum(data, headerlump->filelen);
+		mod->checksum ^= checksum;
+
+		/* Exclude visibility, leafs and nodes from checksum2 */
+		if (i == LUMP_VISIBILITY || i == LUMP_LEAFS || i == LUMP_NODES)
+			continue;
+		mod->checksum2 ^= checksum;
+	}
+	mod->checksum = LittleLong(mod->checksum);
+	mod->checksum2 = LittleLong(mod->checksum2);
 
 	Mod_LoadVertexes (&header->lumps[LUMP_VERTEXES]);
 	Mod_LoadEdges (&header->lumps[LUMP_EDGES], bsp2);
@@ -2533,7 +2558,7 @@ static void Mod_LoadBrushModel (qmodel_t *mod, void *buffer)
 	Mod_LoadFaces (&header->lumps[LUMP_FACES], bsp2);
 	Mod_LoadMarksurfaces (&header->lumps[LUMP_MARKSURFACES], bsp2);
 
-	if (mod->bspversion == BSPVERSION && external_vis.value && sv.modelname[0] && !q_strcasecmp(loadname, sv.name))
+	if (mod->bspversion == BSPVERSION && external_vis.value && !strncmp(mod->name, "maps/", 5))
 	{
 		FILE* fvis;
 		Con_DPrintf("trying to open external vis file\n");
@@ -2599,7 +2624,7 @@ visdone:
 		//johnfitz
 
 		//johnfitz -- correct physics cullboxes so that outlying clip brushes on doors and stuff are handled right
-		if (i > 0 || strcmp(mod->name, sv.modelname) != 0) //skip submodel 0 of sv.worldmodel, which is the actual world
+		if (i > 0 || strncmp(mod->name, "maps/", 5) != 0) //skip submodel 0 of worldmodel, which is the actual world
 		{
 			// start with the hull0 bounds
 			VectorCopy (mod->maxs, mod->clipmaxs);

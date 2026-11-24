@@ -38,9 +38,9 @@ extern "C" {
 
 extern "C" {
 // Engine cvars that no header declares (in_sdl.c declared them for itself too).
-extern cvar_t sv_maxspeed;
 extern cvar_t cl_maxpitch;
 extern cvar_t cl_minpitch;
+extern cvar_t cl_alwaysrun;
 
 // keys.c's record of the keys it holds down, which keys.h doesn't declare.
 extern qboolean keydown[MAX_KEYS];
@@ -339,7 +339,7 @@ StickAxis ApplyEasing(const StickAxis & axis, const float exponent)
 // 400, with +speed walking at that over cl_movespeedkey.
 float MoveSpeed()
 {
-    const float maxSpeed     = sv_maxspeed.value;
+    const float maxSpeed     = movevars.maxspeed;
     const float forwardSpeed = cl_forwardspeed.value;
     const bool  speedKey     = (in_speed.state & 1) != 0;
     const bool  alwaysRun    = (cl_alwaysrun.value != 0.0f) || (forwardSpeed >= maxSpeed);
@@ -618,8 +618,8 @@ void IN_Move(usercmd_t * cmd)
                        s_joyExponent.value);
 
     const float speed = MoveSpeed();
-    cmd->sidemove    += speed * move.x;
-    cmd->forwardmove -= speed * move.y;
+    cmd->sidemove    = static_cast<short>(cmd->sidemove + static_cast<int>(speed * move.x));
+    cmd->forwardmove = static_cast<short>(cmd->forwardmove + static_cast<int>(speed * move.y));
 
     const float frameTime = static_cast<float>(host_frametime);
     cl.viewangles[YAW] -= look.x * s_joySensitivityYaw.value * frameTime;

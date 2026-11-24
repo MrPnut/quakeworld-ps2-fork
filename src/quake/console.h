@@ -31,6 +31,7 @@ extern int con_backscroll;
 extern	qboolean con_forcedup;	// because no entities to refresh
 extern qboolean con_initialized;
 extern byte *con_chars;
+extern int con_ormask;
 
 extern char con_lastcenterstring[]; //johnfitz
 

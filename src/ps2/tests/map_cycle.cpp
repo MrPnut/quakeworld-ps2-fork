@@ -29,6 +29,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#define DEFAULT_VIEWHEIGHT      22
+
 extern "C" {
 // zone.c's hunk bookkeeping, which zone.h doesn't declare.
 extern int hunk_size;
@@ -149,7 +151,7 @@ void Restart()
 
 bool TargetLevelIsUp()
 {
-    return cls.signon == SIGNONS && cl.worldmodel != nullptr && std::strcmp(cl.worldmodel->name, s_targetBsp) == 0;
+    return cls.state == ca_active && cl.worldmodel != nullptr && std::strcmp(cl.worldmodel->name, s_targetBsp) == 0;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -412,7 +414,7 @@ void PlanTour()
     const int numCandidates = CollectCandidates(candidates);
 
     Viewpoint & spawn = s_tour[0];
-    VectorCopy(cl_entities[cl.viewentity].origin, spawn.origin);
+    VectorCopy(cl.simorg, spawn.origin);
     spawn.pitch = 0.0f;
     spawn.yaw   = cl.viewangles[YAW];
     spawn.kind  = "spawn";
@@ -514,7 +516,7 @@ bool AdvanceTour()
     {
         // The spawn is where the player already stands.
         vec3_t d;
-        VectorSubtract(cl_entities[cl.viewentity].origin, v.origin, d);
+        VectorSubtract(cl.simorg, v.origin, d);
         const bool there = (s_tourView == 0) || DotProduct(d, d) < kArriveDist2;
         if (there || s_tourFrame >= kArriveFrames)
         {

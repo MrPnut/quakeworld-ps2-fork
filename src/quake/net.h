@@ -1,8 +1,5 @@
 /*
-Copyright (C) 1996-2001 Id Software, Inc.
-Copyright (C) 2002-2009 John Fitzgibbons and others
-Copyright (C) 2009-2010 Ozkan Sezer
-Copyright (C) 2010-2014 QuakeSpasm developers
+Copyright (C) 1996-1997 Id Software, Inc.
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -17,99 +14,114 @@ See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 */
 
-/*
-	net.h
-	quake's interface to the networking layer
-	network functions and data, common to the
-	whole engine
-*/
+#ifndef CLIENT_NET_H
+#define CLIENT_NET_H
 
-#ifndef _QUAKE_NET_H
-#define _QUAKE_NET_H
+/* net.h -- quake's interface to the networking layer */
 
+#include "common.h"
+#include "cvar.h"
+#include "q_stdinc.h"
 
-#define	NET_NAMELEN		64
+#define	MAX_MSGLEN  8192	// max length of a reliable message
 
-#define NET_MAXMESSAGE		32000	/* [PS2_QUAKE]: FitzQuake's size again (was 64000); every qsocket holds two */
+#define	PORT_ANY	-1
 
-extern int		DEFAULTnet_hostport;
-extern int		net_hostport;
+typedef struct {
+    union {
+	byte b[4];
+	unsigned l;
+    } ip;
+    unsigned short port;
+    unsigned short pad;
+} netadr_t;
 
-extern cvar_t		hostname;
+extern netadr_t net_local_adr;
+extern netadr_t net_from;	/* address of who sent the packet */
+extern sizebuf_t net_message;
 
-extern	double		net_time;
-extern	sizebuf_t	net_message;
-extern	int		net_activeconnections;
+// mrp extern cvar_t hostname;
 
+extern int net_socket;
 
-void	NET_Init (void);
-void	NET_Shutdown (void);
+void NET_Init(int port);
+void NET_Shutdown(void);
+qboolean NET_GetPacket(void);
+void NET_SendPacket(int length, void *data, netadr_t to);
 
-struct qsocket_s	*NET_CheckNewConnections (void);
-// returns a new connection number if there is one pending, else -1
+qboolean NET_CompareAdr(netadr_t a, netadr_t b);
+qboolean NET_CompareBaseAdr(netadr_t a, netadr_t b);
+const char *NET_AdrToString(netadr_t a);
+const char *NET_BaseAdrToString(netadr_t a);
+qboolean NET_StringToAdr(const char *s, netadr_t *a);
 
-struct qsocket_s	*NET_Connect (const char *host);
-// called by client to connect to a host.  Returns -1 if not able to
+/* ======================================================================== */
 
-double NET_QSocketGetTime (const struct qsocket_s *sock);
-const char *NET_QSocketGetAddressString (const struct qsocket_s *sock);
+/* total = oldtotal*OLD_AVG + new*(1-OLD_AVG) */
+#define	OLD_AVG		0.99
+#define	MAX_LATENT	32
 
-qboolean NET_CanSendMessage (struct qsocket_s *sock);
-// Returns true or false if the given qsocket can currently accept a
-// message to be transmitted.
+typedef struct {
+    qboolean fatal_error;
 
-int	NET_GetMessage (struct qsocket_s *sock);
-// returns data in net_message sizebuf
-// returns 0 if no data is waiting
-// returns 1 if a message was received
-// returns 2 if an unreliable message was received
-// returns -1 if the connection died
+    float last_received;	/* for timeouts */
 
-int	NET_SendMessage (struct qsocket_s *sock, sizebuf_t *data);
-int	NET_SendUnreliableMessage (struct qsocket_s *sock, sizebuf_t *data);
-// returns 0 if the message connot be delivered reliably, but the connection
-//		is still considered valid
-// returns 1 if the message was sent properly
-// returns -1 if the connection died
+    /*
+     * the statistics are cleared at each client begin, because
+     * the server connecting process gives a bogus picture of the data
+     */
+    float frame_latency;	/* rolling average */
+    float frame_rate;
 
-int	NET_SendToAll(sizebuf_t *data, double blocktime);
-// This is a reliable *blocking* send to all attached clients.
+    int drop_count;		/* dropped packets, cleared each level */
+    int good_count;		/* cleared each level */
 
-void	NET_Close (struct qsocket_s *sock);
-// if a dead connection is returned by a get or send function, this function
-// should be called when it is convenient
+    netadr_t remote_address;
+    int qport;
 
-// Server calls when a client is kicked off for a game related misbehavior
-// like an illegal protocal conversation.  Client calls when disconnecting
-// from a server.
-// A netcon_t number will not be reused until this function is called for it
+    /* bandwidth estimator */
+    double cleartime;		/* if realtime > nc->cleartime, free to go */
+    double rate;		/* seconds per byte */
 
-void	NET_Poll (void);
+    /* sequencing variables */
+    int incoming_sequence;
+    int incoming_acknowledged;
+    int incoming_reliable_acknowledged;	/* single bit */
 
+    int incoming_reliable_sequence;	/* single bit, maintained local */
 
-// Server list related globals:
-extern	qboolean	slistInProgress;
-extern	qboolean	slistSilent;
-extern	qboolean	slistLocal;
+    int outgoing_sequence;
+    int reliable_sequence;	/* single bit */
+    int last_reliable_sequence;	/* sequence number of last send */
 
-extern	int		hostCacheCount;
+    /* reliable staging and holding areas */
+    sizebuf_t message;		/* writing buffer to send to server */
+    byte message_buf[MAX_MSGLEN];
 
-void	NET_Slist_f (void);
-void	NET_SlistSort (void);
-const char *NET_SlistPrintServer (int n);
-const char *NET_SlistPrintServerName (int n);
+    int reliable_length;
+    byte reliable_buf[MAX_MSGLEN];	/* unacked reliable message */
 
+    /* time and size data to calculate bandwidth */
+    int outgoing_size[MAX_LATENT];
+    double outgoing_time[MAX_LATENT];
+} netchan_t;
 
-/* FIXME: driver related, but public:
- */
-extern	qboolean	ipxAvailable;
-extern	qboolean	tcpipAvailable;
-extern	char		my_ipx_address[NET_NAMELEN];
-extern	char		my_tcpip_address[NET_NAMELEN];
+extern int net_drop;		/* packets dropped before this one */
 
-#endif	/* _QUAKE_NET_H */
+void Netchan_RegisterVariables();
+void Netchan_Init();
+void Netchan_Transmit(netchan_t *chan, int length, byte *data);
+void Netchan_OutOfBand(netadr_t adr, int length, byte *data);
+void Netchan_OutOfBandPrint(netadr_t adr, const char *format, ...)
+    __attribute__((format(printf,2,3)));
+qboolean Netchan_Process(netchan_t *chan);
+void Netchan_Setup(netchan_t *chan, netadr_t adr, int qport);
 
+qboolean Netchan_CanPacket(netchan_t *chan);
+qboolean Netchan_CanReliable(netchan_t *chan);
+
+#endif /* CLIENT_NET_H */

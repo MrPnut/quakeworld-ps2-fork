@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef __CDAUDIO_H
 #define __CDAUDIO_H
 
+#include "quakedef.h"
+
 int	CDAudio_Init (void);
 int	CDAudio_Play (byte track, qboolean looping);
 	/* returns 0 for success, -1 for failure. */

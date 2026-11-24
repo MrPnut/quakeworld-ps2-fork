@@ -85,6 +85,10 @@ extern unsigned char libsd_irx[];
 extern unsigned int  size_libsd_irx;
 extern unsigned char audsrv_irx[];
 extern unsigned int  size_audsrv_irx;
+extern unsigned char netman_irx[];
+extern unsigned int  size_netman_irx;
+extern unsigned char smap_irx[];
+extern unsigned int  size_smap_irx;
 }
 
 // 1 (the default) resets the IOP on every console boot. 0 takes the IOP as launched, reusing the
@@ -136,6 +140,9 @@ constexpr ModuleIdentity kModuleIdentities[] = {
     { "rom0:PADMAN",  { "padman",                  nullptr                }, nullptr,  0      },
     { "rom0:MCMAN",   { "mcman",                   "mcman_cex"            }, nullptr,  0      },
     { "rom0:MCSERV",  { "mcserv",                  nullptr                }, nullptr,  0      },
+    { "netman",       { "Network_Interface_Manager", nullptr              }, "netman", 0      },
+    { "smap",         { "SMAP_driver",             nullptr                }, nullptr,  0      },
+
 };
 
 // ps2sdk's USB mass storage driver before BDM, which older launchers still run. It serves mass:
@@ -182,6 +189,9 @@ const IrxModule kUsbmassBd  = { "usbmass_bd",  usbmass_bd_irx,  &size_usbmass_bd
 const IrxModule kPs2Kbd     = { "ps2kbd",      ps2kbd_irx,      &size_ps2kbd_irx,      nullptr,  0                };
 const IrxModule kLibsd      = { "libsd",       libsd_irx,       &size_libsd_irx,       nullptr,  0                };
 const IrxModule kAudsrv     = { "audsrv",      audsrv_irx,      &size_audsrv_irx,      kAudsrvArgs, sizeof(kAudsrvArgs) };
+const IrxModule kNetman     = { "netman",      netman_irx,      &size_netman_irx,      nullptr,  0                };
+const IrxModule kSmap       = { "smap",        smap_irx,        &size_smap_irx,        nullptr,  0                };
+
 
 // What the modules that load after the boot need of the IOP's memory: sound (libsd, audsrv and its
 // buffers), the ROM's SIO2MAN, PADMAN, MCMAN and MCSERV, and the keyboard driver. A boot that kept
@@ -774,6 +784,7 @@ static DriverStart s_padDriver      = DriverStart::NotTried;
 static DriverStart s_cardDriver     = DriverStart::NotTried;
 static DriverStart s_soundDriver    = DriverStart::NotTried;
 static DriverStart s_keyboardDriver = DriverStart::NotTried;
+static DriverStart s_networkDriver  = DriverStart::NotTried;
 
 // What the last module that wouldn't start answered, for the error that halts the boot.
 static int s_lastFailedId     = 0;
@@ -992,6 +1003,7 @@ void ResetIop(const char * reason)
     s_cardDriver     = DriverStart::NotTried;
     s_soundDriver    = DriverStart::NotTried;
     s_keyboardDriver = DriverStart::NotTried;
+    s_networkDriver  = DriverStart::NotTried;
     s_hddSyncDevice  = nullptr;
 
     ReportLine("the reset took %d ms, leaving %d modules.", Milliseconds() - startMsec, s_numResident);
@@ -1139,6 +1151,13 @@ bool BringUpSoundDriver()
 bool BringUpKeyboardDriver()
 {
     return StartLaterModule(kUsbd) && StartLaterModule(kPs2Kbd);
+}
+
+bool BringUpNetworkDriver()
+{
+    return StartLaterModule(kPs2Dev9) &&
+           StartLaterModule(kNetman)  &&
+           StartLaterModule(kSmap);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1570,6 +1589,11 @@ bool StartSoundDriver()
 bool StartKeyboardDriver()
 {
     return StartOnce(s_keyboardDriver, BringUpKeyboardDriver);
+}
+
+bool StartNetworkDriver()
+{
+    return StartOnce(s_networkDriver, BringUpNetworkDriver);
 }
 
 bool FileIoRemovePatched()

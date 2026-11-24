@@ -151,17 +151,44 @@ PS2_C_SRC = ps2/system/dlmalloc/dlmalloc.c
 # engine logic - gl_model.c's BSP loading feeds the server too - built with
 # their OpenGL halves cut out.
 ENGINE_C_SRC = \
-	quake/chase.c      quake/cl_demo.c    quake/cl_input.c   quake/cl_main.c   \
-	quake/cl_parse.c   quake/cl_tent.c    quake/cmd.c        quake/common.c    \
-	quake/console.c    quake/crc.c        quake/cvar.c       quake/cfgfile.c   \
-	quake/host.c       quake/host_cmd.c   quake/keys.c       quake/mathlib.c   \
-	quake/menu.c       quake/net_main.c   quake/net_loop.c   quake/pr_cmds.c   \
-	quake/pr_edict.c   quake/pr_exec.c    quake/sbar.c       quake/snd_dma.c   \
-	quake/snd_mem.c    quake/snd_mix.c    quake/sv_main.c    quake/sv_move.c   \
-	quake/sv_phys.c    quake/sv_user.c    quake/view.c       quake/wad.c       \
-	quake/world.c      quake/zone.c       quake/strlcat.c    quake/strlcpy.c   \
-	quake/gl_model.c   quake/gl_refrag.c  quake/gl_rlight.c  quake/gl_screen.c \
-	quake/gl_fog.c     quake/r_part.c
+	quake/cl_cam.c \
+	quake/cl_demo.c \
+	quake/cl_ents.c \
+	quake/cl_input.c \
+	quake/cl_main.c \
+	quake/cl_parse.c \
+	quake/cl_pred.c \
+	quake/cl_tent.c \
+	quake/cmd.c \
+	quake/common.c \
+	quake/console.c \
+	quake/crc.c \
+	quake/cvar.c \
+	quake/cfgfile.c \
+	quake/keys.c \
+	quake/mathlib.c \
+	quake/md4.c \
+	quake/menu.c \
+	quake/net_chan.c \
+	quake/pcx.c \
+	quake/pmove.c \
+	quake/pmovetst.c \
+	quake/sbar.c \
+	quake/skin.c \
+	quake/snd_dma.c \
+	quake/snd_mem.c \
+	quake/snd_mix.c \
+	quake/view.c \
+	quake/wad.c \
+	quake/zone.c \
+	quake/strlcat.c \
+	quake/strlcpy.c \
+	quake/gl_model.c \
+	quake/gl_refrag.c \
+	quake/gl_rlight.c \
+	quake/gl_screen.c \
+	quake/gl_fog.c \
+	quake/r_part.c
 
 C_SRC   = $(PS2_C_SRC) $(ENGINE_C_SRC)
 CXX_SRC = $(PS2_CXX_SRC)
@@ -280,7 +307,8 @@ IRX_PATH  = $(PS2SDK)/iop/irx
 IRX_FILES = iomanX.irx fileXio.irx \
             ps2dev9.irx ps2atad.irx ps2hdd.irx ps2fs.irx \
             bdm.irx bdmfs_fatfs.irx usbd.irx usbmass_bd.irx \
-            ps2kbd.irx libsd.irx audsrv.irx
+            ps2kbd.irx libsd.irx audsrv.irx \
+			netman.irx smap.irx
 
 IRX_OBJS  = $(addprefix $(OUTPUT_DIR)/irx/, $(IRX_FILES:.irx=.o))
 
@@ -371,7 +399,7 @@ EE_CXXFLAGS += -std=gnu++20 -fno-exceptions -fno-rtti -fno-threadsafe-statics \
 # hangs its post-mortem off. It contributes nothing to a release build - the whole
 # handler is behind PS2_QUAKE_DEBUG - but the linker only pulls in what is referenced,
 # so leaving it on the line for both configs costs nothing.
-EE_LIBS += -lkernel -ldraw -lgraph -lpacket2 -ldma -lpad -lkbd -laudsrv -lpatches -lfileXio -lmc -leedebug
+EE_LIBS += -lps2ip -lnetman -lkernel -ldraw -lgraph -lpacket2 -ldma -lpad -lkbd -laudsrv -lpatches -lfileXio -lmc -leedebug
 
 # ----------------------------------------------------------------------------
 #  Rules
