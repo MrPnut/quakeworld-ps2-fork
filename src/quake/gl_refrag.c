@@ -148,11 +148,15 @@ R_CheckEfrags -- johnfitz -- check for excessive efrag count
 */
 void R_CheckEfrags (void)
 {
-	if (cls.signon < 2)
-		return; //don't spam when still parsing signon packet full of static ents
-
+	if (cls.state != ca_active)
+	{
+		return;
+	}
+		
 	if (cl.num_efrags > 640 && dev_peakstats.efrags <= 640)
+	{
 		Con_DWarning ("%i efrags exceeds standard limit of 640.\n", cl.num_efrags);
+	}
 
 	dev_stats.efrags = cl.num_efrags;
 	dev_peakstats.efrags = q_max(cl.num_efrags, dev_peakstats.efrags);

@@ -94,12 +94,7 @@ void TakeScreenshot()
 // player is the first client: in single player the only one.
 edict_t * CheatPlayer()
 {
-    if (!sv.active || cls.signon != SIGNONS || svs.clients == nullptr || !svs.clients[0].active
-        || pr_global_struct->deathmatch != 0.0f)
-    {
-        return nullptr;
-    }
-    return svs.clients[0].edict;
+    return nullptr;
 }
 
 bool GodModeOn()

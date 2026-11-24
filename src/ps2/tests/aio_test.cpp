@@ -387,7 +387,7 @@ void RunAioTest()
         return;
 
     case Phase::Stopping:
-        if (!cls.demoplayback && !sv.active)
+        if (!cls.demoplayback)
         {
             s_phase = Phase::Running;
             StartPass();

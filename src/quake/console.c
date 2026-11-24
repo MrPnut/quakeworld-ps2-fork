@@ -32,6 +32,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 #include "quakedef.h"
 
+int         con_ormask = 0;
+
 int 		con_linewidth;
 
 float		con_cursorspeed = 4;
@@ -391,18 +393,20 @@ static void Con_Print (const char *txt)
 
 	if (txt[0] == 1)
 	{
-		mask = 128;		// go to colored text
-		S_LocalSound ("misc/talk.wav");	// play talk wav
+		mask = 128;
+		S_LocalSound ("misc/talk.wav");
 		txt++;
 	}
 	else if (txt[0] == 2)
 	{
-		mask = 128;		// go to colored text
+		mask = 128;
 		txt++;
 	}
 	else
-		mask = 0;
-
+	{
+		mask = con_ormask;
+	}
+	
 	boundary = true;
 
 	while ( (c = *txt) )
@@ -517,14 +521,16 @@ void Con_Printf (const char *fmt, ...)
 	if (!con_initialized)
 		return;
 
-	if (cls.state == ca_dedicated)
-		return;		// no graphics mode
-
+	if (isDedicated)
+	{
+		return;
+	}
+		
 // write it to the scrollable buffer
 	Con_Print (msg);
 
 // update the screen if the console is displayed
-	if (cls.signon != SIGNONS && !scr_disabled_for_loading )
+	if (cls.state != ca_active && !scr_disabled_for_loading)
 	{
 	// protect against infinite loop if something in SCR_UpdateScreen calls
 	// Con_Printd
@@ -699,8 +705,10 @@ void Con_LogCenterPrint (const char *str)
 	if (!strcmp(str, con_lastcenterstring))
 		return; //ignore duplicates
 
-	if (cl.gametype == GAME_DEATHMATCH && con_logcenterprint.value != 2)
-		return; //don't log in deathmatch
+	if (con_logcenterprint.value != 2)
+	{
+		return;
+	}
 
 	strcpy(con_lastcenterstring, str);
 
@@ -830,14 +838,15 @@ typedef struct arg_completion_type_s
 	filelist_item_t	**filelist;
 } arg_completion_type_t;
 
+// mrp
 static const arg_completion_type_t arg_completion_types[] =
 {
-	{ "map ", &extralevels },
-	{ "changelevel ", &extralevels },
-	{ "game ", &modlist },
-	{ "record ", &demolist },
-	{ "playdemo ", &demolist },
-	{ "timedemo ", &demolist }
+//	{ "map ", &extralevels },
+//	{ "changelevel ", &extralevels },
+//	{ "game ", &modlist },
+//	{ "record ", &demolist },
+//	{ "playdemo ", &demolist },
+//	{ "timedemo ", &demolist }
 };
 
 static const int num_arg_completion_types = Q_COUNTOF(arg_completion_types);

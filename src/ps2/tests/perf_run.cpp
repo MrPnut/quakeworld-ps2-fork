@@ -177,7 +177,7 @@ void RunPerfTest()
         break;
 
     case State::Stopping:
-        if (!cls.demoplayback && !sv.active)
+        if (!cls.demoplayback)
         {
             StartDemo();
         }

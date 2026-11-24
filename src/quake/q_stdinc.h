@@ -253,6 +253,9 @@ typedef ptrdiff_t	ssize_t;
 #define inline __inline
 #endif	/* _MSC_VER */
 
+#define qsnprintf  q_snprintf
+#define qvsnprintf q_vsnprintf
+
 /*==========================================================================*/
 
 #endif	/* QSTDINC_H */

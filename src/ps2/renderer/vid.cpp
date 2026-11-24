@@ -740,19 +740,12 @@ void PS2_ReadPixels(byte * rgb)
 // image.c's TGA writer, which went with the rest of image.c: uncompressed, with the channels
 // swapped into TGA's blue-green-red order in place. 'upsidedown' marks the rows as top-down,
 // where GL's readback came bottom-up.
-qboolean Image_WriteTGA(const char * name, byte * data, int width, int height, int bpp, qboolean upsidedown)
+qboolean Image_WriteTGA(const char * filename, byte * data, int width, int height, int bpp, qboolean upsidedown)
 {
     char pathname[MAX_OSPATH];
 
-    // A disc build writes it to the emulator's host: filesystem, and has nowhere on a console.
-    const char * const gamedir = ps2::sys::DebugOutputGamedir();
-    if (gamedir == nullptr)
-    {
-        return false;
-    }
-
-    Sys_mkdir(gamedir); // a 'game' switched to a directory that does not exist yet
-    q_snprintf(pathname, sizeof(pathname), "%s/%s", gamedir, name);
+    Sys_mkdir(com_gamedir); // a 'game' switched to a directory that does not exist yet
+    q_snprintf(pathname, sizeof(pathname), "%s/%s", com_gamedir, filename);
 
     const int handle = Sys_FileOpenWrite(pathname);
     if (handle == -1)

@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <fcntl.h>  // [PS2_QUAKE]: open, for COM_LocateFile
 #include <unistd.h> // [PS2_QUAKE]: close
 #include <errno.h>
+#include <ctype.h>
 
 static char	*largv[MAX_NUM_ARGVS + 1];
 static char	argvdummy[] = " ";
@@ -690,6 +691,8 @@ Handles byte ordering and avoids alignment errors
 // writing functions
 //
 
+usercmd_t nullcmd;
+
 void MSG_WriteChar (sizebuf_t *sb, int c)
 {
 	byte	*buf;
@@ -763,6 +766,31 @@ void MSG_WriteString (sizebuf_t *sb, const char *s)
 		SZ_Write (sb, s, Q_strlen(s)+1);
 }
 
+void MSG_WriteStringf(sizebuf_t *sb, const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    MSG_WriteStringvf(sb, fmt, ap);
+    va_end(ap);
+}
+
+void MSG_WriteStringvf(sizebuf_t *sb, const char *fmt, va_list ap)
+{
+    int maxlen, len;
+
+    /*
+     * FIXME - Kind of ugly to check space first then do getspace
+     * afterwards, but we don't know how much we'll need before
+     * hand. Update the SZ interface?
+     */
+    maxlen = sb->maxsize - sb->cursize;
+    len = qvsnprintf((char *)sb->data + sb->cursize, maxlen, fmt, ap);
+
+    /* Use SZ_GetSpace to check for overflow */
+    SZ_GetSpace(sb, len + 1);
+}
+
 //johnfitz -- original behavior, 13.3 fixed point coords, max range +-4096
 void MSG_WriteCoord16 (sizebuf_t *sb, float f)
 {
@@ -782,34 +810,24 @@ void MSG_WriteCoord32f (sizebuf_t *sb, float f)
 	MSG_WriteFloat (sb, f);
 }
 
-void MSG_WriteCoord (sizebuf_t *sb, float f, unsigned int flags)
+void MSG_WriteCoord(sizebuf_t *sb, float f)
 {
-	if (flags & PRFL_FLOATCOORD)
-		MSG_WriteFloat (sb, f);
-	else if (flags & PRFL_INT32COORD)
-		MSG_WriteLong (sb, Q_rint (f * 16));
-	else if (flags & PRFL_24BITCOORD)
-		MSG_WriteCoord24 (sb, f);
-	else MSG_WriteCoord16 (sb, f);
+    /*
+     * Co-ords are send as shorts, with the low 3 bits being the fractional
+     * component
+     */
+    MSG_WriteShort(sb, (int)(f * (1 << 3)));
 }
 
-void MSG_WriteAngle (sizebuf_t *sb, float f, unsigned int flags)
+void MSG_WriteAngle(sizebuf_t *sb, float f)
 {
-	if (flags & PRFL_FLOATANGLE)
-		MSG_WriteFloat (sb, f);
-	else if (flags & PRFL_SHORTANGLE)
-		MSG_WriteShort (sb, Q_rint(f * 65536.0 / 360.0) & 65535);
-	else MSG_WriteByte (sb, Q_rint(f * 256.0 / 360.0) & 255); //johnfitz -- use Q_rint instead of (int)	}
+    MSG_WriteByte(sb, (int)floorf((f * 256 / 360) + 0.5f) & 255);
 }
 
-//johnfitz -- for PROTOCOL_FITZQUAKE
-void MSG_WriteAngle16 (sizebuf_t *sb, float f, unsigned int flags)
+void MSG_WriteAngle16(sizebuf_t *sb, float f)
 {
-	if (flags & PRFL_FLOATANGLE)
-		MSG_WriteFloat (sb, f);
-	else MSG_WriteShort (sb, Q_rint(f * 65536.0 / 360.0) & 65535);
+    MSG_WriteShort(sb, (int)floorf((f * 65536 / 360) + 0.5f) & 65535);
 }
-//johnfitz
 
 //
 // reading functions
@@ -953,34 +971,103 @@ float MSG_ReadCoord32f (void)
 	return MSG_ReadFloat();
 }
 
-float MSG_ReadCoord (unsigned int flags)
+float MSG_ReadCoord(void)
 {
-	if (flags & PRFL_FLOATCOORD)
-		return MSG_ReadFloat ();
-	else if (flags & PRFL_INT32COORD)
-		return MSG_ReadLong () * (1.0 / 16.0);
-	else if (flags & PRFL_24BITCOORD)
-		return MSG_ReadCoord24 ();
-	else return MSG_ReadCoord16 ();
+    return MSG_ReadShort() * (1.0 / (1 << 3));
 }
 
-float MSG_ReadAngle (unsigned int flags)
+float MSG_ReadAngle(void)
 {
-	if (flags & PRFL_FLOATANGLE)
-		return MSG_ReadFloat ();
-	else if (flags & PRFL_SHORTANGLE)
-		return MSG_ReadShort () * (360.0 / 65536);
-	else return MSG_ReadChar () * (360.0 / 256);
+    return MSG_ReadChar() * (360.0 / 256);
 }
 
-//johnfitz -- for PROTOCOL_FITZQUAKE
-float MSG_ReadAngle16 (unsigned int flags)
+float MSG_ReadAngle16(void)
 {
-	if (flags & PRFL_FLOATANGLE)
-		return MSG_ReadFloat ();	// make sure
-	else return MSG_ReadShort () * (360.0 / 65536);
+    return MSG_ReadShort() * (360.0 / 65536);
 }
-//johnfitz
+
+void MSG_ReadDeltaUsercmd(const usercmd_t *from, usercmd_t *move)
+{
+    int bits;
+
+    memcpy(move, from, sizeof(*move));
+
+    bits = MSG_ReadByte();
+
+// read current angles
+    if (bits & CM_ANGLE1)
+	move->angles[0] = MSG_ReadAngle16();
+    if (bits & CM_ANGLE2)
+	move->angles[1] = MSG_ReadAngle16();
+    if (bits & CM_ANGLE3)
+	move->angles[2] = MSG_ReadAngle16();
+
+// read movement
+    if (bits & CM_FORWARD)
+	move->forwardmove = MSG_ReadShort();
+    if (bits & CM_SIDE)
+	move->sidemove = MSG_ReadShort();
+    if (bits & CM_UP)
+	move->upmove = MSG_ReadShort();
+
+// read buttons
+    if (bits & CM_BUTTONS)
+	move->buttons = MSG_ReadByte();
+
+    if (bits & CM_IMPULSE)
+	move->impulse = MSG_ReadByte();
+
+// read time to run command
+    move->msec = MSG_ReadByte();
+}
+
+void MSG_WriteDeltaUsercmd(sizebuf_t *buf, const usercmd_t *from, const usercmd_t *cmd)
+{
+    int bits;
+
+//
+// send the movement message
+//
+    bits = 0;
+    if (cmd->angles[0] != from->angles[0])
+	bits |= CM_ANGLE1;
+    if (cmd->angles[1] != from->angles[1])
+	bits |= CM_ANGLE2;
+    if (cmd->angles[2] != from->angles[2])
+	bits |= CM_ANGLE3;
+    if (cmd->forwardmove != from->forwardmove)
+	bits |= CM_FORWARD;
+    if (cmd->sidemove != from->sidemove)
+	bits |= CM_SIDE;
+    if (cmd->upmove != from->upmove)
+	bits |= CM_UP;
+    if (cmd->buttons != from->buttons)
+	bits |= CM_BUTTONS;
+    if (cmd->impulse != from->impulse)
+	bits |= CM_IMPULSE;
+
+    MSG_WriteByte(buf, bits);
+
+    if (bits & CM_ANGLE1)
+	MSG_WriteAngle16(buf, cmd->angles[0]);
+    if (bits & CM_ANGLE2)
+	MSG_WriteAngle16(buf, cmd->angles[1]);
+    if (bits & CM_ANGLE3)
+	MSG_WriteAngle16(buf, cmd->angles[2]);
+
+    if (bits & CM_FORWARD)
+	MSG_WriteShort(buf, cmd->forwardmove);
+    if (bits & CM_SIDE)
+	MSG_WriteShort(buf, cmd->sidemove);
+    if (bits & CM_UP)
+	MSG_WriteShort(buf, cmd->upmove);
+
+    if (bits & CM_BUTTONS)
+	MSG_WriteByte(buf, cmd->buttons);
+    if (bits & CM_IMPULSE)
+	MSG_WriteByte(buf, cmd->impulse);
+    MSG_WriteByte(buf, cmd->msec);
+}
 
 //===========================================================================
 
@@ -1211,6 +1298,24 @@ void COM_AddExtension (char *path, const char *extension, size_t len)
 		q_strlcat(path, extension, len);
 }
 
+/*
+==================
+COM_DefaultExtension
+Returns non-zero if the extension wouldn't fit in the output buffer
+==================
+*/
+int COM_DefaultExtension(const char *path, const char *extension, char *out, size_t buflen)
+{
+    COM_StripExtension(path, out, buflen);
+    if (strlen(out) + strlen(extension) + 1 > buflen)
+	{
+		return -1;
+	}
+	
+    memcpy(out + strlen(out), extension, strlen(extension) + 1);
+
+    return 0;
+}
 
 /*
 ==============
@@ -1685,6 +1790,7 @@ typedef struct
 #define MAX_FILES_IN_PACK	2048
 
 char	com_gamedir[MAX_OSPATH];
+char    com_gamedirfile[MAX_OSPATH];
 char	com_basedir[MAX_OSPATH];
 int	file_from_pak;		// ZOID: global indicating that file came from a pak
 
@@ -2479,174 +2585,18 @@ _add_path:
 	}
 }
 
-//==============================================================================
-//johnfitz -- dynamic gamedir stuff -- modified by QuakeSpasm team.
-//==============================================================================
-static void COM_Game_f (void)
-{
-	if (Cmd_Argc() > 1)
-	{
-		const char *p = Cmd_Argv(1);
-		const char *p2 = Cmd_Argv(2);
-		searchpath_t *search;
-
-		if (!registered.value) //disable shareware quake
-		{
-			Con_Printf("You must have the registered version to use modified games\n");
-			return;
-		}
-
-		if (!*p || !strcmp(p, ".") || strstr(p, "..") || strstr(p, "/") || strstr(p, "\\") || strstr(p, ":"))
-		{
-			Con_Printf ("gamedir should be a single directory name, not a path\n");
-			return;
-		}
-
-		if (*p2)
-		{
-			if (strcmp(p2,"-hipnotic") && strcmp(p2,"-rogue") && strcmp(p2,"-quoth")) {
-				Con_Printf ("invalid mission pack argument to \"game\"\n");
-				return;
-			}
-			if (!q_strcasecmp(p, GAMENAME)) {
-				Con_Printf ("no mission pack arguments to %s game\n", GAMENAME);
-				return;
-			}
-		}
-
-		if (Sys_FileType(va("%s/%s", com_basedir, p)) != FS_ENT_DIRECTORY)
-		{
-			if (host_parms->userdir == host_parms->basedir || (Sys_FileType(va("%s/%s", host_parms->userdir, p)) != FS_ENT_DIRECTORY))
-			{
-				Con_Printf ("No such game directory \"%s\"\n", p);
-				return;
-			}
-		}
-
-		if (!q_strcasecmp(p, COM_SkipPath(com_gamedir))) //no change
-		{
-			if (com_searchpaths->path_id > 1) { //current game not id1
-				if (*p2 && com_searchpaths->path_id == 2) {
-					// rely on QuakeSpasm extension treating '-game missionpack'
-					// as '-missionpack', otherwise would be a mess
-					if (!q_strcasecmp(p, &p2[1]))
-						goto _same;
-					Con_Printf("reloading game \"%s\" with \"%s\" support\n", p, &p2[1]);
-				}
-				else if (!*p2 && com_searchpaths->path_id > 2)
-					Con_Printf("reloading game \"%s\" without mission pack support\n", p);
-				else goto _same;
-			}
-			else { _same:
-				Con_Printf("\"game\" is already \"%s\"\n", COM_SkipPath(com_gamedir));
-				return;
-			}
-		}
-
-		com_modified = true;
-
-		//Kill the server
-		CL_Disconnect ();
-		Host_ShutdownServer(true);
-
-		//Write config file
-		Host_WriteConfiguration ();
-
-		//Kill the extra game if it is loaded
-		PS2_AsyncIoDrain (); // [PS2_QUAKE]: a background read may still be going through a pack closed below
-		while (com_searchpaths != com_base_searchpaths)
-		{
-			if (com_searchpaths->pack)
-			{
-				if (com_searchpaths->pack->pkz) // [PS2_QUAKE]: a compressed pack has no handle
-					PS2_PkzClose (com_searchpaths->pack->pkz);
-				else
-					Sys_FileClose (com_searchpaths->pack->handle);
-				if (com_searchpaths->pack->asyncFd >= 0) // [PS2_QUAKE]: the loader's descriptor on a .pak
-					close (com_searchpaths->pack->asyncFd);
-				Z_Free (com_searchpaths->pack->files);
-				Z_Free (com_searchpaths->pack);
-			}
-			search = com_searchpaths->next;
-			Z_Free (com_searchpaths);
-			com_searchpaths = search;
-		}
-		hipnotic = false;
-		rogue = false;
-		standard_quake = true;
-
-		if (q_strcasecmp(p, GAMENAME)) //game is not id1
-		{
-			if (*p2) {
-				COM_AddGameDirectory (com_basedir, &p2[1]);
-				standard_quake = false;
-				if (!strcmp(p2,"-hipnotic") || !strcmp(p2,"-quoth"))
-					hipnotic = true;
-				else if (!strcmp(p2,"-rogue"))
-					rogue = true;
-				if (q_strcasecmp(p, &p2[1])) //don't load twice
-					COM_AddGameDirectory (com_basedir, p);
-			}
-			else {
-				COM_AddGameDirectory (com_basedir, p);
-				// QuakeSpasm extension: treat '-game missionpack' as '-missionpack'
-				if (!q_strcasecmp(p,"hipnotic") || !q_strcasecmp(p,"quoth")) {
-					hipnotic = true;
-					standard_quake = false;
-				}
-				else if (!q_strcasecmp(p,"rogue")) {
-					rogue = true;
-					standard_quake = false;
-				}
-			}
-		}
-		else // just update com_gamedir
-		{
-			q_snprintf (com_gamedir, sizeof(com_gamedir), "%s/%s",
-					(host_parms->userdir != host_parms->basedir)?
-						   host_parms->userdir : com_basedir,
-					GAMENAME);
-		}
-
-		//clear out and reload appropriate data
-		LOC_Shutdown();
-		Cache_Flush ();
-		Mod_ResetAll();
-		Sky_ClearAll();
-		if (!isDedicated)
-		{
-			TexMgr_NewGame ();
-			Draw_NewGame ();
-			R_NewGame ();
-		}
-		ExtraMaps_NewGame ();
-		Host_Resetdemos ();
-		DemoList_Rebuild ();
-
-		Con_Printf("\"game\" changed to \"%s\"\n", COM_SkipPath(com_gamedir));
-
-		LOC_Init ();
-		VID_Lock ();
-		Cbuf_AddText ("exec quake.rc\n");
-		Cbuf_AddText ("vid_unlock\n");
-	}
-	else //Diplay the current gamedir
-		Con_Printf("\"game\" is \"%s\"\n", COM_SkipPath(com_gamedir));
-}
-
 /*
 =================
 COM_InitFilesystem
 =================
 */
-void COM_InitFilesystem (void) //johnfitz -- modified based on topaz's tutorial
+void COM_InitFilesystem (void)
 {
 	int i, j;
 
 	Cvar_RegisterVariable (&registered);
 	Cvar_RegisterVariable (&cmdline);
 	Cmd_AddCommand ("path", COM_Path_f);
-	Cmd_AddCommand ("game", COM_Game_f); //johnfitz
 
 	i = COM_CheckParm ("-basedir");
 	if (i && i < com_argc-1)
@@ -2659,51 +2609,98 @@ void COM_InitFilesystem (void) //johnfitz -- modified based on topaz's tutorial
 	if ((com_basedir[j-1] == '\\') || (com_basedir[j-1] == '/'))
 		com_basedir[j-1] = 0;
 
-	// start up with GAMENAME by default (id1)
+	// start up with GAMENAME by default (id1), then always mount qw on top
 	COM_AddGameDirectory (com_basedir, GAMENAME);
+	COM_AddGameDirectory (com_basedir, "qw");
 
-	/* this is the end of our base searchpath:
-	 * any set gamedirs, such as those from -game command line
-	 * arguments or by the 'game' console command will be freed
-	 * up to here upon a new game command. */
+	/* Lock id1 + qw as the permanent base searchpath */
 	com_base_searchpaths = com_searchpaths;
 
-	// add mission pack requests (only one should be specified)
-	if (COM_CheckParm ("-rogue"))
-		COM_AddGameDirectory (com_basedir, "rogue");
-	if (COM_CheckParm ("-hipnotic"))
-		COM_AddGameDirectory (com_basedir, "hipnotic");
-	if (COM_CheckParm ("-quoth"))
-		COM_AddGameDirectory (com_basedir, "quoth");
+	// Support both -gamedir (QW standard) and -game (QuakeSpasm habit)
+	i = COM_CheckParm ("-gamedir");
+	if (!i)
+		i = COM_CheckParm ("-game");
 
-	i = COM_CheckParm ("-game");
 	if (i && i < com_argc-1)
 	{
 		const char *p = com_argv[i + 1];
 		if (!*p || !strcmp(p, ".") || strstr(p, "..") || strstr(p, "/") || strstr(p, "\\") || strstr(p, ":"))
 			Sys_Error ("gamedir should be a single directory name, not a path\n");
+
 		com_modified = true;
-		// don't load mission packs twice
-		if (COM_CheckParm ("-rogue") && !q_strcasecmp(p, "rogue")) p = NULL;
-		if (p && COM_CheckParm ("-hipnotic") && !q_strcasecmp(p, "hipnotic")) p = NULL;
-		if (p && COM_CheckParm ("-quoth") && !q_strcasecmp(p, "quoth")) p = NULL;
-		if (p != NULL) {
+		if (q_strcasecmp(p, GAMENAME) && q_strcasecmp(p, "qw"))
 			COM_AddGameDirectory (com_basedir, p);
-			// QuakeSpasm extension: treat '-game missionpack' as '-missionpack'
-			if (!q_strcasecmp(p,"rogue")) {
-				rogue = true;
-				standard_quake = false;
-			}
-			if (!q_strcasecmp(p,"hipnotic") || !q_strcasecmp(p,"quoth")) {
-				hipnotic = true;
-				standard_quake = false;
-			}
-		}
 	}
 
 	COM_CheckRegistered ();
 }
 
+qboolean COM_Gamedir (const char *directory, enum game_type game_type)
+{
+	searchpath_t *search;
+
+	if (!directory || !*directory)
+		directory = "qw";
+
+	if (!strcmp(directory, ".") || strstr(directory, "..") || strstr(directory, "/") || strstr(directory, "\\") || strstr(directory, ":"))
+	{
+		Con_Printf("gamedir should be a single directory name, not a path\n");
+		return false;
+	}
+
+	if (!COM_CheckForGameDirectoryChange(directory, game_type))
+		return false;
+
+	com_modified = true;
+
+	// [PS2_QUAKE]: Wait for any background IOP/CDVD read to finish before closing packs
+	PS2_AsyncIoDrain();
+
+	while (com_searchpaths != com_base_searchpaths)
+	{
+		if (com_searchpaths->pack)
+		{
+			if (com_searchpaths->pack->pkz)
+				PS2_PkzClose(com_searchpaths->pack->pkz);
+			else
+				Sys_FileClose(com_searchpaths->pack->handle);
+
+			if (com_searchpaths->pack->asyncFd >= 0)
+				close(com_searchpaths->pack->asyncFd);
+
+			Z_Free(com_searchpaths->pack->files);
+			Z_Free(com_searchpaths->pack);
+		}
+		search = com_searchpaths->next;
+		Z_Free(com_searchpaths);
+		com_searchpaths = search;
+	}
+
+	// Mount the requested mod directory on top of id1 + qw (which are locked in com_base_searchpaths)
+	if (q_strcasecmp(directory, GAMENAME) && q_strcasecmp(directory, "qw"))
+	{
+		COM_AddGameDirectory(com_basedir, directory);
+	}
+	else
+	{
+		// Reset com_gamedir string back to qw (or id1)
+		q_snprintf(com_gamedir, sizeof(com_gamedir), "%s/%s",
+			(host_parms->userdir != host_parms->basedir) ? host_parms->userdir : com_basedir,
+			directory);
+	}
+
+	// Flush and reload QuakeSpasm / PS2 renderer & cache assets
+	Cache_Flush();
+	Mod_ResetAll();
+	Sky_ClearAll();
+	TexMgr_NewGame();
+	Draw_NewGame();
+	R_NewGame();
+
+	Con_Printf("\"gamedir\" changed to \"%s\"\n", COM_SkipPath(com_gamedir));
+
+	return true;
+}
 
 /* The following FS_*() stdio replacements are necessary if one is
  * to perform non-sequential reads on files reopened on pak files
@@ -3284,4 +3281,332 @@ size_t LOC_Format (const char *format, const char* (*getarg_fn) (int idx, void* 
 	out[written] = 0;
 
 	return written;
+}
+
+static const char *Info_ReadString(const char *infostring, char *buffer, int buflen)
+{
+    char *out = buffer;
+
+    while (out - buffer < buflen - 1)
+	{
+		if (!*infostring || *infostring == '\\')
+		{
+			break;
+		}
+	    
+		*out++ = *infostring++;
+    }
+    *out = 0;
+
+    return infostring;
+}
+
+static const char *Info_ReadValue(const char *infostring, char *buffer, int buflen)
+{
+    infostring = Info_ReadString(infostring, buffer, buflen);
+
+    if (*infostring && *infostring != '\\')
+	{
+		Con_DPrintf("WARNING: info value too long? (%s)\n", buffer);
+	}
+	
+    return infostring;
+}
+
+static const char *Info_ReadKey(const char *infostring, char *buffer, int buflen)
+{
+    const char *pkey;
+
+    if (*infostring == '\\')
+	{
+		infostring++;
+	}
+	
+    pkey = infostring;
+    infostring = Info_ReadString(infostring, buffer, buflen);
+
+    /* If we aren't at a separator, then the key was too long */
+    if (*buffer && *infostring != '\\')
+	{
+		Con_DPrintf("WARNING: No separator after info key (%s)\n", pkey);
+	}
+
+    return infostring;
+}
+
+void Info_RemoveKey(char *infostring, const char *key)
+{
+    char *start;
+    char pkey[MAX_INFO_STRING];
+    char value[MAX_INFO_STRING];
+
+    if (strstr(key, "\\"))
+	{
+		Con_Printf("Can't use a key with a \\\n");
+	
+		return;
+    }
+
+    while (1) {
+		start = infostring;
+
+		infostring = (char *)Info_ReadKey(infostring, pkey, sizeof(pkey));
+		if (*infostring)
+		{
+			infostring++;
+		}
+	    
+		infostring = (char *)Info_ReadValue(infostring, value, sizeof(value));
+		if (*infostring)
+		{
+			infostring++;
+		}
+	    
+		if (!strcmp(key, pkey))
+		{
+	    	memmove(start, infostring, strlen(infostring) + 1);
+	    
+			return;
+		}
+
+		if (!*infostring)
+		{
+			return;
+		}
+    }
+}
+
+void Info_SetValueForStarKey(char *infostring, const char *key, const char *value, int maxsize)
+{
+    char buffer[MAX_INFO_STRING * 2];
+    char *oldvalue, *info;
+    int c, len;
+
+    if (strstr(key, "\\") || strstr(value, "\\")) {
+	Con_Printf("Can't use keys or values with a \\\n");
+	return;
+    }
+    if (strstr(key, "\"") || strstr(value, "\"")) {
+	Con_Printf("Can't use keys or values with a \"\n");
+	return;
+    }
+    if (strlen(key) > 63 || strlen(value) > 63) {
+	Con_Printf("Keys and values must be < 64 characters.\n");
+	return;
+    }
+
+    oldvalue = Info_ValueForKey(infostring, key);
+    if (*oldvalue) {
+	/*
+	 * Key exists. Make sure we have enough room for new value.
+	 * If we don't, don't change it!
+	 */
+	len = strlen(infostring) - strlen(oldvalue) + strlen(value);
+	if (len > maxsize - 1)
+	    goto ErrTooLong;
+    }
+
+    Info_RemoveKey(infostring, key);
+    if (!value || !strlen(value))
+	return;
+
+    len = qsnprintf(buffer, sizeof(buffer), "\\%s\\%s", key, value);
+    if (len > sizeof(buffer) - 1)
+	goto ErrTooLong;
+
+    len += strlen(infostring);
+    if (len > maxsize - 1)
+	goto ErrTooLong;
+
+    /* Append the new key/value pair to the info string */
+    infostring += strlen(infostring);
+    info = buffer;
+    while (*info) {
+	c = (unsigned char)*info++;
+#ifndef SERVERONLY
+	/* client only allows highbits on name */
+	if (strcasecmp(key, "name")) {
+	    c &= 127;
+	    if (c < 32 || c > 127)
+		continue;
+	    /* auto lowercase team */
+	    if (!strcasecmp(key, "team"))
+		c = tolower(c);
+	}
+#else
+	if (!sv_highchars.value) {
+	    c &= 127;
+	    if (c < 32 || c > 127)
+		continue;
+	}
+#endif
+	if (c > 13)
+	    *infostring++ = c;
+    }
+    *infostring = 0;
+    return;
+
+ ErrTooLong:
+	Con_Printf("Info string length exceeded\n");
+}
+
+void
+Info_Print(const char *infostring)
+{
+    char key[MAX_INFO_STRING];
+    char value[MAX_INFO_STRING];
+
+    while (*infostring) {
+	infostring = Info_ReadKey(infostring, key, sizeof(key));
+	if (*infostring)
+	    infostring++;
+	infostring = Info_ReadValue(infostring, value, sizeof(value));
+	if (*infostring)
+	    infostring++;
+
+	Con_Printf("%-20.20s %s\n", key, *value ? value : "MISSING VALUE");
+    }
+}
+
+qboolean COM_CheckForGameDirectoryChange(const char *directory, enum game_type game_type)
+{
+    const char *current = COM_SkipPath(com_gamedir);
+
+    if (!directory || !directory[0])
+	{
+		directory = "qw";
+	}
+
+    return q_strcasecmp(current, directory) != 0;
+}
+
+/*
+===============
+Info_ValueForKey
+
+Searches the string for the given
+key and returns the associated value, or an empty string.
+===============
+*/
+char *
+Info_ValueForKey(const char *infostring, const char *key)
+{
+    /* use multiple buffers so compares work without stomping on each other */
+    static char buffers[4][MAX_INFO_STRING];
+    static int buffer_index;
+
+    char pkey[MAX_INFO_STRING];
+    char *buf;
+
+    buffer_index = (buffer_index + 1) & 3;
+    buf = buffers[buffer_index];
+
+    while (1) {
+	/* Retrieve the key */
+	infostring = Info_ReadKey(infostring, pkey, sizeof(pkey));
+	if (*infostring != '\\') {
+	    *buf = 0;
+	    return buf;
+	}
+	infostring++;
+
+	/* Retrieve the value */
+	infostring = Info_ReadString(infostring, buf, sizeof(buffers[0]));
+	if (*infostring && *infostring != '\\') {
+	    *buf = 0;
+	    return buf;
+	}
+
+	/* If the keys match, return the value in the buffer */
+	if (!strcmp(key, pkey))
+	    return buf;
+
+	/* Return if we've reached the end of the infostring */
+	if (!*infostring) {
+	    *buf = 0;
+	    return buf;
+	}
+	infostring++;
+    }
+}
+
+void
+Info_SetValueForKey(char *infostring, const char *key, const char *value, int maxsize)
+{
+    if (key[0] == '*') {
+	Con_Printf("Can't set * keys\n");
+	return;
+    }
+    Info_SetValueForStarKey(infostring, key, value, maxsize);
+}
+
+static byte chktbl[1024 + 4] = {
+    0x78, 0xd2, 0x94, 0xe3, 0x41, 0xec, 0xd6, 0xd5, 0xcb, 0xfc, 0xdb, 0x8a, 0x4b, 0xcc, 0x85, 0x01,
+    0x23, 0xd2, 0xe5, 0xf2, 0x29, 0xa7, 0x45, 0x94, 0x4a, 0x62, 0xe3, 0xa5, 0x6f, 0x3f, 0xe1, 0x7a,
+    0x64, 0xed, 0x5c, 0x99, 0x29, 0x87, 0xa8, 0x78, 0x59, 0x0d, 0xaa, 0x0f, 0x25, 0x0a, 0x5c, 0x58,
+    0xfb, 0x00, 0xa7, 0xa8, 0x8a, 0x1d, 0x86, 0x80, 0xc5, 0x1f, 0xd2, 0x28, 0x69, 0x71, 0x58, 0xc3,
+    0x51, 0x90, 0xe1, 0xf8, 0x6a, 0xf3, 0x8f, 0xb0, 0x68, 0xdf, 0x95, 0x40, 0x5c, 0xe4, 0x24, 0x6b,
+    0x29, 0x19, 0x71, 0x3f, 0x42, 0x63, 0x6c, 0x48, 0xe7, 0xad, 0xa8, 0x4b, 0x91, 0x8f, 0x42, 0x36,
+    0x34, 0xe7, 0x32, 0x55, 0x59, 0x2d, 0x36, 0x38, 0x38, 0x59, 0x9b, 0x08, 0x16, 0x4d, 0x8d, 0xf8,
+    0x0a, 0xa4, 0x52, 0x01, 0xbb, 0x52, 0xa9, 0xfd, 0x40, 0x18, 0x97, 0x37, 0xff, 0xc9, 0x82, 0x27,
+    0xb2, 0x64, 0x60, 0xce, 0x00, 0xd9, 0x04, 0xf0, 0x9e, 0x99, 0xbd, 0xce, 0x8f, 0x90, 0x4a, 0xdd,
+    0xe1, 0xec, 0x19, 0x14, 0xb1, 0xfb, 0xca, 0x1e, 0x98, 0x0f, 0xd4, 0xcb, 0x80, 0xd6, 0x05, 0x63,
+    0xfd, 0xa0, 0x74, 0xa6, 0x86, 0xf6, 0x19, 0x98, 0x76, 0x27, 0x68, 0xf7, 0xe9, 0x09, 0x9a, 0xf2,
+    0x2e, 0x42, 0xe1, 0xbe, 0x64, 0x48, 0x2a, 0x74, 0x30, 0xbb, 0x07, 0xcc, 0x1f, 0xd4, 0x91, 0x9d,
+    0xac, 0x55, 0x53, 0x25, 0xb9, 0x64, 0xf7, 0x58, 0x4c, 0x34, 0x16, 0xbc, 0xf6, 0x12, 0x2b, 0x65,
+    0x68, 0x25, 0x2e, 0x29, 0x1f, 0xbb, 0xb9, 0xee, 0x6d, 0x0c, 0x8e, 0xbb, 0xd2, 0x5f, 0x1d, 0x8f,
+    0xc1, 0x39, 0xf9, 0x8d, 0xc0, 0x39, 0x75, 0xcf, 0x25, 0x17, 0xbe, 0x96, 0xaf, 0x98, 0x9f, 0x5f,
+    0x65, 0x15, 0xc4, 0x62, 0xf8, 0x55, 0xfc, 0xab, 0x54, 0xcf, 0xdc, 0x14, 0x06, 0xc8, 0xfc, 0x42,
+    0xd3, 0xf0, 0xad, 0x10, 0x08, 0xcd, 0xd4, 0x11, 0xbb, 0xca, 0x67, 0xc6, 0x48, 0x5f, 0x9d, 0x59,
+    0xe3, 0xe8, 0x53, 0x67, 0x27, 0x2d, 0x34, 0x9e, 0x9e, 0x24, 0x29, 0xdb, 0x69, 0x99, 0x86, 0xf9,
+    0x20, 0xb5, 0xbb, 0x5b, 0xb0, 0xf9, 0xc3, 0x67, 0xad, 0x1c, 0x9c, 0xf7, 0xcc, 0xef, 0xce, 0x69,
+    0xe0, 0x26, 0x8f, 0x79, 0xbd, 0xca, 0x10, 0x17, 0xda, 0xa9, 0x88, 0x57, 0x9b, 0x15, 0x24, 0xba,
+    0x84, 0xd0, 0xeb, 0x4d, 0x14, 0xf5, 0xfc, 0xe6, 0x51, 0x6c, 0x6f, 0x64, 0x6b, 0x73, 0xec, 0x85,
+    0xf1, 0x6f, 0xe1, 0x67, 0x25, 0x10, 0x77, 0x32, 0x9e, 0x85, 0x6e, 0x69, 0xb1, 0x83, 0x00, 0xe4,
+    0x13, 0xa4, 0x45, 0x34, 0x3b, 0x40, 0xff, 0x41, 0x82, 0x89, 0x79, 0x57, 0xfd, 0xd2, 0x8e, 0xe8,
+    0xfc, 0x1d, 0x19, 0x21, 0x12, 0x00, 0xd7, 0x66, 0xe5, 0xc7, 0x10, 0x1d, 0xcb, 0x75, 0xe8, 0xfa,
+    0xb6, 0xee, 0x7b, 0x2f, 0x1a, 0x25, 0x24, 0xb9, 0x9f, 0x1d, 0x78, 0xfb, 0x84, 0xd0, 0x17, 0x05,
+    0x71, 0xb3, 0xc8, 0x18, 0xff, 0x62, 0xee, 0xed, 0x53, 0xab, 0x78, 0xd3, 0x65, 0x2d, 0xbb, 0xc7,
+    0xc1, 0xe7, 0x70, 0xa2, 0x43, 0x2c, 0x7c, 0xc7, 0x16, 0x04, 0xd2, 0x45, 0xd5, 0x6b, 0x6c, 0x7a,
+    0x5e, 0xa1, 0x50, 0x2e, 0x31, 0x5b, 0xcc, 0xe8, 0x65, 0x8b, 0x16, 0x85, 0xbf, 0x82, 0x83, 0xfb,
+    0xde, 0x9f, 0x36, 0x48, 0x32, 0x79, 0xd6, 0x9b, 0xfb, 0x52, 0x45, 0xbf, 0x43, 0xf7, 0x0b, 0x0b,
+    0x19, 0x19, 0x31, 0xc3, 0x85, 0xec, 0x1d, 0x8c, 0x20, 0xf0, 0x3a, 0xfa, 0x80, 0x4d, 0x2c, 0x7d,
+    0xac, 0x60, 0x09, 0xc0, 0x40, 0xee, 0xb9, 0xeb, 0x13, 0x5b, 0xe8, 0x2b, 0xb1, 0x20, 0xf0, 0xce,
+    0x4c, 0xbd, 0xc6, 0x04, 0x86, 0x70, 0xc6, 0x33, 0xc3, 0x15, 0x0f, 0x65, 0x19, 0xfd, 0xc2, 0xd3,
+
+// map checksum goes here
+    0x00, 0x00, 0x00, 0x00
+};
+
+/*
+====================
+COM_BlockSequenceCRCByte
+
+For proxy protecting
+====================
+*/
+byte COM_BlockSequenceCRCByte(const byte *base, int length, int sequence)
+{
+    unsigned short crc;
+    const byte *p;
+    byte chkb[60 + 4];
+
+    p = chktbl + (sequence % (sizeof(chktbl) - 8));
+
+    if (length > 60)
+	length = 60;
+    memcpy(chkb, base, length);
+
+    chkb[length] = (sequence & 0xff) ^ p[0];
+    chkb[length + 1] = p[1];
+    chkb[length + 2] = ((sequence >> 8) & 0xff) ^ p[2];
+    chkb[length + 3] = p[3];
+
+    length += 4;
+
+    crc = CRC_Block(chkb, length);
+
+    crc &= 0xff;
+
+    return crc;
 }

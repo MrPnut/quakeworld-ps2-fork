@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // comndef.h  -- general definitions
 
+#include "q_stdinc.h"
+
 #if defined(_WIN32)
 #ifdef _MSC_VER
 #  pragma warning(disable:4244)
@@ -177,15 +179,21 @@ extern	float	(*LittleFloat) (float l);
 
 //============================================================================
 
+extern struct usercmd_s nullcmd;
+
 void MSG_WriteChar (sizebuf_t *sb, int c);
 void MSG_WriteByte (sizebuf_t *sb, int c);
 void MSG_WriteShort (sizebuf_t *sb, int c);
 void MSG_WriteLong (sizebuf_t *sb, int c);
 void MSG_WriteFloat (sizebuf_t *sb, float f);
 void MSG_WriteString (sizebuf_t *sb, const char *s);
-void MSG_WriteCoord (sizebuf_t *sb, float f, unsigned int flags);
-void MSG_WriteAngle (sizebuf_t *sb, float f, unsigned int flags);
-void MSG_WriteAngle16 (sizebuf_t *sb, float f, unsigned int flags); //johnfitz
+void MSG_WriteStringf(sizebuf_t *sb, const char *fmt, ...);
+void MSG_WriteStringvf(sizebuf_t *sb, const char *fmt, va_list ap);
+void MSG_WriteCoord(sizebuf_t *sb, float f);
+void MSG_WriteAngle(sizebuf_t *sb, float f);
+void MSG_WriteAngle16(sizebuf_t *sb, float f);
+void MSG_ReadDeltaUsercmd(const struct usercmd_s *from, struct usercmd_s *cmd);
+void MSG_WriteDeltaUsercmd(sizebuf_t *sb, const struct usercmd_s *from, const struct usercmd_s *cmd);
 
 extern	int			msg_readcount;
 extern	qboolean	msg_badread;		// set if a read goes beyond end of message
@@ -198,9 +206,8 @@ int MSG_ReadLong (void);
 float MSG_ReadFloat (void);
 const char *MSG_ReadString (void);
 
-float MSG_ReadCoord (unsigned int flags);
-float MSG_ReadAngle (unsigned int flags);
-float MSG_ReadAngle16 (unsigned int flags); //johnfitz
+float MSG_ReadCoord(void);
+float MSG_ReadAngle(void);
 
 //============================================================================
 
@@ -276,6 +283,7 @@ const char *COM_SkipPath (const char *pathname);
 void COM_StripExtension (const char *in, char *out, size_t outsize);
 void COM_FileBase (const char *in, char *out, size_t outsize);
 void COM_AddExtension (char *path, const char *extension, size_t len);
+int COM_DefaultExtension(const char *path, const char *extension, char *out, size_t buflen);
 #if 0 /* COM_DefaultExtension can be dangerous */
 void COM_DefaultExtension (char *path, const char *extension, size_t len);
 #endif
@@ -312,6 +320,9 @@ size_t LOC_Format (const char *format, const char* (*getarg_fn)(int idx, void* u
 //============================================================================
 
 // QUAKEFS
+
+#define	MAX_QPATH	64		// max length of a quake game pathname
+
 typedef struct
 {
 	char	name[MAX_QPATH];
@@ -350,6 +361,7 @@ struct cache_user_s;
 
 extern	char	com_basedir[MAX_OSPATH];
 extern	char	com_gamedir[MAX_OSPATH];
+extern  char    com_gamedirfile[];
 extern	int	file_from_pak;	// global indicating that file came from a pak
 
 void COM_WriteFile (const char *filename, const void *data, int len);
@@ -454,5 +466,30 @@ extern struct cvar_s	registered;
 extern qboolean		standard_quake, rogue, hipnotic;
 extern qboolean		fitzmode;
 	/* if true, run in fitzquake mode disabling custom quakespasm hacks */
+
+#define	MAX_INFO_STRING 256
+#define	MAX_SERVERINFO_STRING 1024
+#define	MAX_LOCALINFO_STRING 32768
+
+enum game_type {
+    GAME_TYPE_ID1,
+    GAME_TYPE_QW,
+    GAME_TYPE_HIPNOTIC,
+    GAME_TYPE_ROGUE,
+    GAME_TYPE_QUOTH,
+};
+
+void Host_Gamedir (const char *directory, enum game_type game_type);
+
+qboolean COM_CheckForGameDirectoryChange(const char *gamedir, enum game_type game_type);
+qboolean COM_Gamedir (const char *directory, enum game_type game_type);
+
+void Info_SetValueForStarKey(char *infostring, const char *key, const char *value, int maxsize);
+void Info_Print(const char *infostring);
+char *Info_ValueForKey(const char *infostring, const char *key);
+void Info_SetValueForKey(char *infostring, const char *key, const char *value, int maxsize);
+
+byte COM_BlockSequenceCRCByte(const byte *base, int length, int sequence);
+unsigned Com_BlockChecksum(const void *buffer, int length);
 
 #endif	/* Q_COMMON_H */

@@ -585,21 +585,19 @@ void SCR_DrawTurtle (void)
 	Draw_Pic (scr_vrect.x, scr_vrect.y, scr_turtle);
 }
 
-/*
-==============
-SCR_DrawNet
-==============
-*/
 void SCR_DrawNet (void)
 {
-	if (realtime - cl.last_received_message < 0.3)
+	if (cls.netchan.outgoing_sequence - cls.netchan.incoming_acknowledged < UPDATE_BACKUP - 1)
+	{
 		return;
+	}
+		
 	if (cls.demoplayback)
+	{
 		return;
+	}
 
-	GL_SetCanvas (CANVAS_DEFAULT); //johnfitz
-
-	Draw_Pic (scr_vrect.x+64, scr_vrect.y, scr_net);
+	Draw_Pic (scr_vrect.x + 64, scr_vrect.y, scr_net);
 }
 
 /*
@@ -684,7 +682,7 @@ void SCR_SetUpToDrawConsole (void)
 		return;		// never a console with loading plaque
 
 // decide on the height of the console
-	con_forcedup = !cl.worldmodel || cls.signon != SIGNONS;
+	con_forcedup = !cl.worldmodel || cls.state != ca_active;
 
 	if (con_forcedup)
 	{
@@ -837,7 +835,7 @@ void SCR_BeginLoadingPlaque (void)
 
 	if (cls.state != ca_connected)
 		return;
-	if (cls.signon != SIGNONS)
+	if (cls.state != ca_active)
 		return;
 
 // redraw with no console and the loading plaque
@@ -943,8 +941,10 @@ int SCR_ModalMessage (const char *text, float timeout) //johnfitz -- timeout
 	double time1, time2; //johnfitz -- timeout
 	int lastkey, lastchar;
 
-	if (cls.state == ca_dedicated)
+	if (isDedicated)
+	{
 		return true;
+	}
 
 	scr_notifystring = text;
 

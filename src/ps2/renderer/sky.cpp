@@ -997,11 +997,11 @@ void Sky_LoadTextureQ64(qmodel_t * mod, texture_t * mt)
 
 // A skybox is six images loaded from gfx/env/, which the PS2 doesn't load (see Image_LoadImage):
 // the scrolling layers stay, as QuakeSpasm keeps them when a skybox is missing.
-void Sky_LoadSkyBox(const char * name)
+void Sky_LoadSkyBox(const char * skyboxName)
 {
-    if (name != nullptr && name[0] != '\0')
+    if (skyboxName != nullptr && skyboxName[0] != '\0')
     {
-        Con_Printf("Couldn't load skybox %s: no external images on the PS2\n", name);
+        Con_Printf("Couldn't load skybox %s: no external images on the PS2\n", skyboxName);
     }
 }
 

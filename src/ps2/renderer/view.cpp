@@ -506,22 +506,6 @@ void ClearTextureChains(qmodel_t & model, const texchain_t chain)
     }
 }
 
-// Whether the camera's leaf holds a turbulent surface. Seen through a water surface the camera is
-// next to, the other side is in a leaf the camera's own PVS may not reach: MarkSurfaces takes the
-// PVS of everything around the eye then.
-bool NearWaterPortal(const mleaf_t & leaf)
-{
-    msurface_t * const * mark = leaf.firstmarksurface;
-    for (int i = 0; i < leaf.nummarksurfaces; ++i, ++mark)
-    {
-        if (((*mark)->flags & SURF_DRAWTURB) != 0)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 // Marks the surfaces of every leaf the PVS lets through and the frustum doesn't cull, chains the
 // ones facing the camera, rebuilds their lightmaps if their lighting moved, and adds the static
 // entities standing in those leafs to the frame's entity list.
@@ -535,10 +519,6 @@ void MarkSurfaces()
     if (r_novis.value != 0.0f || r_viewleaf->contents == CONTENTS_SOLID || r_viewleaf->contents == CONTENTS_SKY)
     {
         vis = Mod_NoVisPVS(&world);
-    }
-    else if (NearWaterPortal(*r_viewleaf))
-    {
-        vis = SV_FatPVS(r_origin, &world);
     }
     else
     {
@@ -1055,7 +1035,7 @@ void DrawEntitiesOnList(rs::TriangleStream & stream, const bool alphaPass)
         }
 
         // The chase camera's view of the player leans back less (QuakeSpasm's chasecam).
-        if (&e == &cl_entities[cl.viewentity])
+        if (&e == &cl_player_entities[cl.playernum])
         {
             e.angles[PITCH] *= 0.3f;
         }
@@ -1081,11 +1061,11 @@ void DrawEntitiesOnList(rs::TriangleStream & stream, const bool alphaPass)
 // player is invisible or dead.
 void DrawViewModel()
 {
-    if (r_drawviewmodel.value == 0.0f || r_drawentities.value == 0.0f || chase_active.value != 0.0f)
+    if (r_drawviewmodel.value == 0.0f || r_drawentities.value == 0.0f)
     {
         return;
     }
-    if ((cl.items & IT_INVISIBILITY) != 0 || cl.stats[STAT_HEALTH] <= 0)
+    if ((cl.stats[STAT_ITEMS] & IT_INVISIBILITY) != 0 || cl.stats[STAT_HEALTH] <= 0)
     {
         return;
     }
@@ -1251,7 +1231,7 @@ void SetupView()
     // The cheat-safe draw modes take in single player only, r_fullbright over r_lightmap.
     s_fullbrightMode = false;
     s_lightmapMode   = false;
-    if (cl.maxclients == 1)
+    if (cls.demoplayback)
     {
         if (r_fullbright.value != 0.0f || cl.worldmodel->lightdata == nullptr)
         {

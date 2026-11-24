@@ -65,6 +65,7 @@ interface from being ambiguous.
 
 #define	CVAR_NONE		0
 #define	CVAR_ARCHIVE		(1U << 0)	// if set, causes it to be saved to config
+#define CVAR_CONFIG CVAR_ARCHIVE
 #define	CVAR_NOTIFY		(1U << 1)	// changes will be broadcasted to all players (q1)
 #define	CVAR_SERVERINFO		(1U << 2)	// added to serverinfo will be sent to clients (q1/net_dgrm.c and qwsv)
 #define	CVAR_USERINFO		(1U << 3)	// added to userinfo, will be sent to server (qwcl)

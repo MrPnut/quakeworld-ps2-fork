@@ -180,8 +180,7 @@ bool RumbleWanted()
 {
     return s_pad != nullptr &&
            s_inRumble.value != 0.0f &&
-           cls.state == ca_connected &&
-           cls.signon == SIGNONS &&
+           (cls.state == ca_connected || cls.state == ca_active) &&
            !cls.demoplayback &&
            key_dest == key_game &&
            !cl.paused &&
@@ -203,12 +202,15 @@ void Play(const RumbleEffect & effect)
 // per update that carries one.
 void CheckShots()
 {
-    const entity_t & player = cl_entities[cl.viewentity];
-    if ((player.effects & EF_MUZZLEFLASH) == 0 || player.msgtime == s_lastFlashTime)
+    const frame_t * frame = &cl.frames[cls.netchan.incoming_sequence & UPDATE_MASK];
+    const player_state_t & player = frame->playerstate[cl.playernum];
+
+    if ((player.effects & EF_MUZZLEFLASH) == 0 || frame->receivedtime <= s_lastFlashTime)
     {
         return;
     }
-    s_lastFlashTime = player.msgtime;
+
+    s_lastFlashTime = frame->receivedtime;
 
     const int weapon = cl.stats[STAT_ACTIVEWEAPON];
     for (const WeaponRumble & entry : kWeaponRumbles)
@@ -225,8 +227,10 @@ void CheckShots()
 // kind still runs plays only as a pickup.
 void CheckPowerups()
 {
-    const int gained = cl.items & ~s_lastItems & kPowerupItems;
-    s_lastItems = cl.items;
+    const int items = cl.stats[STAT_ITEMS];
+    const int gained = items & ~s_lastItems & kPowerupItems;
+    s_lastItems = items;
+    
     if (gained != 0)
     {
         Play(kPowerupRumble);
@@ -260,8 +264,8 @@ void UpdateRumble()
     {
         // Events are changes from the frame before, so there has to be one.
         s_primed        = true;
-        s_lastItems     = cl.items;
-        s_lastFlashTime = cl_entities[cl.viewentity].msgtime;
+        s_lastFlashTime = cl.frames[cls.netchan.incoming_sequence & UPDATE_MASK].receivedtime;
+        s_lastItems     = cl.stats[STAT_ITEMS];
     }
     else
     {

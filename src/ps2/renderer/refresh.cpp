@@ -140,7 +140,7 @@ void R_NewMap()
     ps2::view::NewMap();   // the liquids' opacity, from worldspawn
 
     // A "FLOG#map" row, so the frame log scripts can split a capture by level.
-    ps2::debug::FrameLogMarkMap(cl.mapname);
+    ps2::debug::FrameLogMarkMap(Info_ValueForKey(cl.serverinfo, "map"));
 
     PS2_LOAD_TRACE("R_NewMap: done");
 #if PS2_QUAKE_LOAD_TRACE
@@ -191,9 +191,9 @@ void GL_SubdivideSurface(msurface_t * fa)
 
 // No external replacement textures (textures/*.tga and the like) on the PS2: the textures come
 // from the BSP, the WAD and the models.
-byte * Image_LoadImage(const char * name, int * width, int * height)
+byte * Image_LoadImage(const char * filename, int * width, int * height)
 {
-    (void)name;
+    (void)filename;
     (void)width;
     (void)height;
     return nullptr;

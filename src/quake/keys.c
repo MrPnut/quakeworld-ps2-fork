@@ -45,6 +45,8 @@ qboolean	consolekeys[MAX_KEYS];	// if true, can't be rebound while in console
 qboolean	menubound[MAX_KEYS];	// if true, can't be rebound while in menu
 qboolean	keydown[MAX_KEYS];
 
+cvar_t	cfg_unbindall = {"cfg_unbindall", "1", CVAR_ARCHIVE};
+
 typedef struct
 {
 	const char	*name;
@@ -897,6 +899,7 @@ void Key_Init (void)
 	Cmd_AddCommand ("bind",Key_Bind_f);
 	Cmd_AddCommand ("unbind",Key_Unbind_f);
 	Cmd_AddCommand ("unbindall",Key_Unbindall_f);
+	Cvar_RegisterVariable(&cfg_unbindall);
 }
 
 static struct {
@@ -1215,8 +1218,10 @@ void Key_UpdateForDest (void)
 {
 	static qboolean forced = false;
 
-	if (cls.state == ca_dedicated)
+	if (isDedicated)
+	{
 		return;
+	}
 
 	switch (key_dest)
 	{

@@ -692,18 +692,18 @@ void BGM_Play(const char * filename)
         return;
     }
 
-    char name[MAX_QPATH];
+    char trackName[MAX_QPATH];
     const char * const extension = COM_FileGetExtension(filename);
     bool opened = false;
 
-    const char * const relatives[] = { name };
+    const char * const relatives[] = { trackName };
     if (extension[0] == '\0')
     {
         // Each extension through every game directory, then the next, as bgmusic.c tried its
         // codecs.
         for (const char * const ext : kMusicExtensions)
         {
-            q_snprintf(name, sizeof(name), "music/%s.%s", filename, ext);
+            q_snprintf(trackName, sizeof(trackName), "music/%s.%s", filename, ext);
             if (OpenMusicFile(relatives, 1))
             {
                 opened = true;
@@ -713,7 +713,7 @@ void BGM_Play(const char * filename)
     }
     else if (q_strcasecmp(extension, "adp") == 0 || q_strcasecmp(extension, "wav") == 0)
     {
-        q_snprintf(name, sizeof(name), "music/%s", filename);
+        q_snprintf(trackName, sizeof(trackName), "music/%s", filename);
         opened = OpenMusicFile(relatives, 1);
     }
     else

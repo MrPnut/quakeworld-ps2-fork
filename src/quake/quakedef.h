@@ -82,9 +82,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // fall over
 #define	ROLL		2
 
-
-#define	MAX_QPATH	64		// max length of a quake game pathname
-
 #define	ON_EPSILON	0.1		// point on plane side epsilon
 
 #define	DIST_EPSILON	(0.03125)	// 1/32 epsilon to keep floating point happy (moved from world.c)
@@ -92,7 +89,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // [PS2_QUAKE]: FitzQuake's 32000 again for both (QuakeSpasm has 64000). Every client and qsocket
 // carries buffers this size, and SV_SendClientDatagram puts a MAX_DATAGRAM one on the stack - half
 // of the EE's 128 KB main stack at 64000.
-#define	MAX_MSGLEN	32000		// max length of a reliable message
 #define	MAX_DATAGRAM	32000		// max length of unreliable message
 
 #define	DATAGRAM_MTU	1400		// johnfitz -- actual limit for unreliable messages to nonlocal clients
@@ -101,7 +97,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // per-level limits
 //
 #define	MIN_EDICTS	256		// johnfitz -- lowest allowed value for max_edicts cvar
-#define	MAX_EDICTS	32000		// johnfitz -- highest allowed value for max_edicts cvar
+#define	MAX_EDICTS	512		// johnfitz -- highest allowed value for max_edicts cvar
 						// ents past 8192 can't play sounds in the standard protocol
 #define	MAX_LIGHTSTYLES	64
 #define	MAX_MODELS	1024		// [PS2_QUAKE]: was 4096; id's content needs at most 256
@@ -130,6 +126,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define	STAT_TOTALMONSTERS	12
 #define	STAT_SECRETS		13	// bumped on client side by svc_foundsecret
 #define	STAT_MONSTERS		14	// bumped by svc_killedmonster
+#define STAT_ITEMS          15
 
 // stock defines
 //
@@ -254,7 +251,6 @@ typedef struct
 #include "sbar.h"
 #include "q_sound.h"
 #include "client.h"
-
 #include "gl_model.h"
 #include "world.h"
 
@@ -300,9 +296,9 @@ typedef struct filelist_item_s
 	struct filelist_item_s	*next;
 } filelist_item_t;
 
-extern filelist_item_t	*modlist;
-extern filelist_item_t	*extralevels;
-extern filelist_item_t	*demolist;
+// mrp extern filelist_item_t	*modlist;
+// mrp extern filelist_item_t	*extralevels;
+// mrp extern filelist_item_t	*demolist;
 
 void Host_ClearMemory (void);
 void Host_ServerFrame (void);
@@ -323,14 +319,11 @@ void Host_ShutdownServer (qboolean crash);
 void Host_WriteConfiguration (void);
 void Host_Resetdemos (void);
 
-void ExtraMaps_Init (void);
-void Modlist_Init (void);
-void DemoList_Init (void);
+// void Modlist_Init (void);
+// void DemoList_Init (void);
 
 void ExtraMaps_NewGame (void);
 void DemoList_Rebuild (void);
-
-void Host_SyncExternalFS (void);
 
 extern int		current_skill;	// skill level for currently loaded level (in case
 					//  the user changes the cvar while the level is
