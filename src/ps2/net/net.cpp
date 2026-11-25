@@ -97,10 +97,12 @@ namespace {
     static bool s_ps2ipInitialized  = false;
     static int  s_udpSocket         = -1;
 
-    static cvar_t net_dhcp    = { "net_dhcp",    "1",             CVAR_NONE, 0.0f, nullptr, nullptr, nullptr };
-    static cvar_t net_ip      = { "net_ip",      "10.0.2.15",     CVAR_NONE, 0.0f, nullptr, nullptr, nullptr };
-    static cvar_t net_netmask = { "net_netmask", "255.255.255.0", CVAR_NONE, 0.0f, nullptr, nullptr, nullptr };
-    static cvar_t net_gateway = { "net_gateway", "10.0.2.2",      CVAR_NONE, 0.0f, nullptr, nullptr, nullptr };
+    static cvar_t net_dhcp    = { "net_dhcp",    "1",             CVAR_ARCHIVE, 0.0f, nullptr, nullptr, nullptr };
+    static cvar_t net_ip      = { "net_ip",      "10.0.2.15",     CVAR_ARCHIVE, 0.0f, nullptr, nullptr, nullptr };
+    static cvar_t net_netmask = { "net_netmask", "255.255.255.0", CVAR_ARCHIVE, 0.0f, nullptr, nullptr, nullptr };
+    static cvar_t net_gateway = { "net_gateway", "10.0.2.2",      CVAR_ARCHIVE, 0.0f, nullptr, nullptr, nullptr };
+
+    static int s_requestedPort = PORT_ANY;
 
     bool IsLoopbackIp(const netadr_t & adr)
     {
@@ -138,6 +140,7 @@ namespace {
         {
             if (NetManIoctl(NETMAN_NETIF_IOCTL_GET_LINK_STATUS, nullptr, 0, nullptr, 0) == NETMAN_NETIF_ETH_LINK_STATE_UP)
             {
+                Sys_Sleep(500);
                 return true;
             }
             Sys_Sleep(50);
@@ -146,7 +149,7 @@ namespace {
         return false;
     }
 
-    bool ConfigureIpInterface(bool useDhcp)
+        bool ConfigureIpInterface(bool useDhcp)
     {
         if (!WaitForEthernetLink(10000))
         {
@@ -205,31 +208,30 @@ namespace {
             return false;
         }
 
-        const u32 wantDhcp = useDhcp ? 1u : 0u;
-        if (wantDhcp != ipInfo.dhcp_enabled ||
-            (!useDhcp &&
-             (ip.addr != ipInfo.ipaddr.s_addr ||
-              netmask.addr != ipInfo.netmask.s_addr ||
-              gateway.addr != ipInfo.gw.s_addr)))
+        if (useDhcp)
         {
-            if (useDhcp)
-            {
-                ipInfo.dhcp_enabled = 1;
-            }
-            else
-            {
-                ipInfo.dhcp_enabled   = 0;
-                ipInfo.ipaddr.s_addr  = ip.addr;
-                ipInfo.netmask.s_addr = netmask.addr;
-                ipInfo.gw.s_addr      = gateway.addr;
-            }
+            ipInfo.dhcp_enabled = 0;
+            ps2ip_setconfig(&ipInfo);
+            Sys_Sleep(50);
+            ipInfo.dhcp_enabled = 1;
+            ps2ip_setconfig(&ipInfo);
+        }
+        else if (ipInfo.dhcp_enabled != 0 ||
+                 ip.addr != ipInfo.ipaddr.s_addr ||
+                 netmask.addr != ipInfo.netmask.s_addr ||
+                 gateway.addr != ipInfo.gw.s_addr)
+        {
+            ipInfo.dhcp_enabled   = 0;
+            ipInfo.ipaddr.s_addr  = ip.addr;
+            ipInfo.netmask.s_addr = netmask.addr;
+            ipInfo.gw.s_addr      = gateway.addr;
             ps2ip_setconfig(&ipInfo);
         }
 
         if (useDhcp)
         {
             Con_Printf("NET_Init: waiting for DHCP lease...\n");
-            const int deadline = ps2::sys::Milliseconds() + 10000;
+            const int deadline = ps2::sys::Milliseconds() + 15000;
             while (ps2::sys::Milliseconds() < deadline)
             {
                 if (ps2ip_getconfig(ifName, &ipInfo) >= 0 &&
@@ -317,6 +319,32 @@ namespace {
 
         return sock;
     }
+
+    void NET_Restart_f()
+    {
+        if (!s_netmanInitialized)
+        {
+            Con_Printf("NET_Restart: network driver not initialized\n");
+            return;
+        }
+
+        if (s_udpSocket >= 0)
+        {
+            lwip_close(s_udpSocket);
+            s_udpSocket = -1;
+        }
+
+        if (!ConfigureIpInterface(net_dhcp.value != 0.0f))
+        {
+            return;
+        }
+
+        s_udpSocket = OpenUdpSocket(s_requestedPort);
+        if (s_udpSocket >= 0)
+        {
+            Con_Printf("UDP Reinitialized (%s)\n", NET_AdrToString(net_local_adr));
+        }
+    }
 }
 
 extern "C" {
@@ -332,6 +360,9 @@ extern "C" {
         Cvar_RegisterVariable(&net_ip);
         Cvar_RegisterVariable(&net_netmask);
         Cvar_RegisterVariable(&net_gateway);
+
+        s_requestedPort = port;
+        Cmd_AddCommand("net_restart", NET_Restart_f);
 
         net_message.maxsize = sizeof(net_message_buffer);
         net_message.data    = net_message_buffer;
@@ -353,15 +384,14 @@ extern "C" {
             return;
         }
 
-         if (!s_netmanInitialized)
+        if (!s_netmanInitialized)
         {
             if (NetManInit() < 0)
             {
                 Con_Printf("NET_Init: NetManInit failed (loopback only)\n");
-                
+
                 return;
             }
-            NetManSetLinkMode(NETMAN_NETIF_ETH_LINK_MODE_AUTO);
             s_netmanInitialized = true;
         }
 

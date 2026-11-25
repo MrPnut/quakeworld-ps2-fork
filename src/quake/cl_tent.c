@@ -322,24 +322,21 @@ CL_ParseTEnt(void)
 }
 
 
-/*
-=================
-CL_NewTempEntity
-=================
-*/
 entity_t *
 CL_NewTempEntity(void)
 {
     entity_t *entity;
 
     if (cl_numvisedicts == MAX_VISEDICTS)
-	return NULL;
+        return NULL;
     if (num_temp_entities == MAX_TEMP_ENTITIES)
         return NULL;
 
     entity = &cl_temp_entities[num_temp_entities++];
     memset(entity, 0, sizeof(*entity));
 
+    entity->scale = ENTSCALE_DEFAULT;
+    entity->alpha = ENTALPHA_DEFAULT;
     entity->colormap = vid.colormap;
     entity->lerpflags = LERP_RESETMOVE | LERP_RESETANIM;
 

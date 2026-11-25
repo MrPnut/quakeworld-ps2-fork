@@ -619,7 +619,7 @@ void IN_Move(usercmd_t * cmd)
 
     const float speed = MoveSpeed();
     cmd->sidemove    = static_cast<short>(cmd->sidemove + static_cast<int>(speed * move.x));
-    cmd->forwardmove = static_cast<short>(cmd->forwardmove + static_cast<int>(speed * move.y));
+    cmd->forwardmove = static_cast<short>(cmd->forwardmove - static_cast<int>(speed * move.y));
 
     const float frameTime = static_cast<float>(host_frametime);
     cl.viewangles[YAW] -= look.x * s_joySensitivityYaw.value * frameTime;
