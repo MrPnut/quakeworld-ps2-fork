@@ -111,7 +111,7 @@ static bool s_traceFirstView = false;
 
 void R_NewMap()
 {
-    PS2_LOAD_TRACE("R_NewMap: %s", cl.mapname);
+    PS2_LOAD_TRACE("R_NewMap: %s", cl.worldmodel ? cl.worldmodel->name : "<null>");
 
     for (int i = 0; i < 256; ++i)
     {

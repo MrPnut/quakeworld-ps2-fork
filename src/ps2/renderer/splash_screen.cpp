@@ -22,6 +22,7 @@
 #include "ps2/renderer/splash_screen.h"
 #include "ps2/renderer/gif_writer.h"
 #include "ps2/builtin/builtin.h"
+#include "ps2/builtin/qw_splash.h"
 #include "ps2/system/heap.h"
 #include "ps2/system/sys.h"
 
@@ -46,8 +47,8 @@ constexpr int kFrameVramAddr = 0;
 // written, and ShowImage's texels, which take up to 10 pages (320x64 at 32 bits).
 constexpr int kVramPageWords   = 2048;
 constexpr int kTextureVramAddr = 80 * kVramPageWords;
-constexpr int kZBufferVramAddr = 85 * kVramPageWords; // past the five 64x32 pages of the plaque's 144 rows
-constexpr int kImageVramAddr   = 96 * kVramPageWords;
+constexpr int kZBufferVramAddr = 97 * kVramPageWords;  // 80 + 17 pages (512x68 RGBA32)
+constexpr int kImageVramAddr   = 114 * kVramPageWords; // past zbuffer
 constexpr int kImageMaxWidth   = 320;
 constexpr int kImageMaxHeight  = 64;
 
@@ -85,18 +86,6 @@ static bool            s_retired       = false; // gs::Init owns VRAM: nothing m
 static int             s_shownHeight   = 0;
 static video::Standard s_shownStandard = video::Standard::Ntsc;
 
-// A palette colour with its three colour channels scaled by kColorIntensity.
-u32 ScaleColor(const u32 color)
-{
-    u32 scaledColor = color & 0xFF000000u;
-    for (u32 shift = 0; shift < 24; shift += 8)
-    {
-        const float channel = static_cast<float>((color >> shift) & 0xFFu) * kColorIntensity;
-        scaledColor |= ((channel >= 255.0f) ? 255u : static_cast<u32>(channel)) << shift;
-    }
-    return scaledColor;
-}
-
 bool SendAndWait(qword_t * const data, const int qwords, const bool chain)
 {
     if (chain)
@@ -122,16 +111,6 @@ int ExtentLog2(const int size)
     return log2;
 }
 
-void FillPlaque(u32 * const texels)
-{
-    const int numTexels = qplaque_width * qplaque_height;
-    for (int i = 0; i < numTexels; ++i)
-    {
-        const int index = qplaque_data[i];
-        texels[i] = (index == kTransparentIndex) ? 0u : ScaleColor(global_palette[index]);
-    }
-}
-
 // Draws a picture at kScale times its size with its top-left corner at (x, y), over a black clear
 // of the screen when `clear` is set, in three GIF transfers: the drawing environment (and the
 // clear), the texels' upload to `vramAddr` as an RGBA32 texture, and the sprite. `fill` writes the
@@ -141,8 +120,8 @@ void FillPlaque(u32 * const texels)
 // inside the picture, so nothing past it is ever sampled. False if there is no memory for it or
 // the GIF didn't take the transfers.
 template<typename FillTexels>
-bool DrawPicture(const int width, const int height, const int vramAddr, const int x, const int y, const bool clear,
-                 const FillTexels & fill)
+bool DrawPicture(const int width, const int height, const int scale, const int vramAddr, const int x, const int y,
+                 const bool clear, const FillTexels & fill)
 {
     const int numTexels   = width * height;
     const int bufferWidth = (width + 63) & ~63;
@@ -231,8 +210,8 @@ bool DrawPicture(const int width, const int height, const int vramAddr, const in
     rect.v0.z    = 0u;
     rect.t0.u    = 0.0f;
     rect.t0.v    = 0.0f;
-    rect.v1.x    = static_cast<float>(x + (width * kScale) - 1);
-    rect.v1.y    = static_cast<float>(y + (height * kScale) - 1);
+    rect.v1.x    = static_cast<float>(x + (width * scale) - 1);
+    rect.v1.y    = static_cast<float>(y + (height * scale) - 1);
     rect.v1.z    = 0u;
     rect.t1.u    = static_cast<float>(width);
     rect.t1.v    = static_cast<float>(height);
@@ -265,14 +244,21 @@ bool DrawPicture(const int width, const int height, const int vramAddr, const in
     return true;
 }
 
-// The plaque, centred on a black screen.
 bool DrawPlaque()
 {
-    const int x = (kFrameWidth - (qplaque_width * kScale)) / 2;
-    const int y = (s_shownHeight - (qplaque_height * kScale)) / 2;
-    return DrawPicture(qplaque_width, qplaque_height, kTextureVramAddr, x, y, /*clear=*/true, FillPlaque);
-}
+    constexpr int kSplashScale = 1;
+    const int x = (kFrameWidth - (qw_splash_width * kSplashScale)) / 2;
+    const int y = (s_shownHeight - (qw_splash_height * kSplashScale)) / 2;
 
+    return DrawPicture(qw_splash_width, qw_splash_height, kSplashScale, kTextureVramAddr, x, y, /*clear=*/true,
+                       [](u32 * const texels) {
+                           const int numTexels = qw_splash_width * qw_splash_height;
+                           for (int i = 0; i < numTexels; ++i)
+                           {
+                               texels[i] = qw_splash_palette[qw_splash_data[i]];
+                           }
+                       });
+}
 } // namespace
 
 void Show()
@@ -323,7 +309,7 @@ bool ShowImage(const u32 * const texels, const int width, const int height)
 
     const int x = (kFrameWidth - (width * kScale)) / 2;
     const int y = (s_shownHeight - (height * kScale)) / 2;
-    return DrawPicture(width, height, kImageVramAddr, x, y, /*clear=*/false, [=](u32 * const out) {
+    return DrawPicture(width, height, kScale, kImageVramAddr, x, y, false, [=](u32 * const out) {
         std::memcpy(out, texels, static_cast<size_t>(width * height) * sizeof(u32));
     });
 }

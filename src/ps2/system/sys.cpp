@@ -423,13 +423,13 @@ void Sys_SendKeyEvents()
     // The load trace's heartbeat, once a second while a level comes up: connected, not yet
     // signed on. It says the frames still run, and at which signon a load sits.
     static int s_lastBeatMsec = 0;
-    if (cls.state == ca_connected && cls.signon != SIGNONS)
+    if (cls.state == ca_connected || cls.state == ca_onserver)
     {
         const int msec = ps2::sys::Milliseconds();
         if ((msec - s_lastBeatMsec) >= 1000)
         {
             s_lastBeatMsec = msec;
-            PS2_LOAD_TRACE("heartbeat: signon %d, server %s, plaque %s", cls.signon, sv.active ? "up" : "down",
+            PS2_LOAD_TRACE("heartbeat: signon %d, plaque %s", static_cast<int>(cls.state),
                            scr_disabled_for_loading ? "up" : "down");
         }
     }

@@ -142,11 +142,19 @@ namespace {
             }
             Sys_Sleep(50);
         }
+
         return false;
     }
 
     bool ConfigureIpInterface(bool useDhcp)
     {
+        if (!WaitForEthernetLink(10000))
+        {
+            Con_Printf("NET_Init: Ethernet link down (loopback only)\n");
+
+            return false;
+        }
+
         ip4_addr_t ip      = {};
         ip4_addr_t netmask = {};
         ip4_addr_t gateway = {};
@@ -182,6 +190,7 @@ namespace {
             if (ps2ipInit(&ip, &netmask, &gateway) < 0)
             {
                 Con_Printf("NET_Init: ps2ipInit failed\n");
+
                 return false;
             }
             s_ps2ipInitialized = true;
@@ -192,6 +201,7 @@ namespace {
         if (ps2ip_getconfig(ifName, &ipInfo) < 0)
         {
             Con_Printf("NET_Init: ps2ip_getconfig(sm0) failed\n");
+
             return false;
         }
 
@@ -216,12 +226,6 @@ namespace {
             ps2ip_setconfig(&ipInfo);
         }
 
-        if (!WaitForEthernetLink(10000))
-        {
-            Con_Printf("NET_Init: Ethernet link down (loopback only)\n");
-            return false;
-        }
-
         if (useDhcp)
         {
             Con_Printf("NET_Init: waiting for DHCP lease...\n");
@@ -234,12 +238,17 @@ namespace {
                     ipInfo.ipaddr.s_addr != 0)
                 {
                     net_local_adr.ip.l = ipInfo.ipaddr.s_addr;
+
                     return true;
                 }
                 Sys_Sleep(100);
             }
 
-            Con_Printf("NET_Init: DHCP timed out; falling back to static IP (%s)\n", net_ip.string);
+            Con_Printf("NET_Init: DHCP timed out (status=%u, ip=%s); falling back to static IP (%s)\n",
+                static_cast<unsigned>(ipInfo.dhcp_status),
+                inet_ntoa(ipInfo.ipaddr),
+                net_ip.string);
+
             ipInfo.dhcp_enabled = 0;
             const in_addr_t fallbackIp      = inet_addr(net_ip.string);
             const in_addr_t fallbackNetmask = inet_addr(net_netmask.string);
@@ -267,6 +276,7 @@ namespace {
         if (sock < 0)
         {
             Con_Printf("NET_Init: socket() failed\n");
+
             return -1;
         }
 
@@ -274,6 +284,7 @@ namespace {
         {
             Con_Printf("NET_Init: fcntl(O_NONBLOCK) failed\n");
             lwip_close(sock);
+
             return -1;
         }
 
@@ -290,6 +301,7 @@ namespace {
         {
             Con_Printf("NET_Init: bind(port %d) failed\n", port);
             lwip_close(sock);
+
             return -1;
         }
 
@@ -305,7 +317,6 @@ namespace {
 
         return sock;
     }
-
 }
 
 extern "C" {
@@ -347,6 +358,7 @@ extern "C" {
             if (NetManInit() < 0)
             {
                 Con_Printf("NET_Init: NetManInit failed (loopback only)\n");
+                
                 return;
             }
             NetManSetLinkMode(NETMAN_NETIF_ETH_LINK_MODE_AUTO);

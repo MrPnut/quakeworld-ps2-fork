@@ -158,10 +158,6 @@ CL_Quit_f
 void
 CL_Quit_f(void)
 {
-    if (1 /* key_dest != key_console *//* && cls.state != ca_dedicated */ ) {
-	M_Menu_Quit_f();
-	return;
-    }
     CL_Disconnect();
     Sys_Quit();
 }
