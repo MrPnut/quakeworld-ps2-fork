@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "arch_def.h"
 #include "ps2/engine_hooks.h" // [PS2_QUAKE]: the pad's button names
+#include "ps2_qw/mod_menu.h"
 
 /* key up events are sent even if in console mode */
 
@@ -999,7 +1000,7 @@ void Key_EventWithKeycode (int key, qboolean down, int keycode)
 		}
 		// [PS2_QUAKE]: by the pad's names and its menus rather than a keyboard's F4, and not while
 		// a menu is up, whose own buttons (Circle's back, Square's clear) need no bind
-		else if (key >= 200 && !keybindings[key] && key_dest != key_menu)
+		else if (key >= 200 && !keybindings[key] && key_dest != key_menu && !PS2QW_IsModMenuKey(key))
 			Con_Printf ("%s is unbound: bind it in Options, Controls.\n",
 				PS2_PadKeyName (key) ? PS2_PadKeyName (key) : Key_KeynumToString(key));
 	}
@@ -1016,6 +1017,11 @@ void Key_EventWithKeycode (int key, qboolean down, int keycode)
 			if (keycode > 0)
 				key_inputgrab.lastchar = keycode;
 		}
+		return;
+	}
+
+	if (PS2QW_HandleModMenuKey(key, down))
+	{
 		return;
 	}
 

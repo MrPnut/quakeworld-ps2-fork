@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "ps2/engine_hooks.h" // [PS2_QUAKE]: the save game hooks and the debug page
+#include "ps2_qw/ingame_menu.h"
 #include "bgmusic.h"
 
 void (*vid_menucmdfn)(void); //johnfitz
@@ -217,15 +218,24 @@ void M_ToggleMenu_f (void)
 
 	if (key_dest == key_menu)
 	{
-		if (m_state != m_main)
+		if (m_state != m_main && m_state != m_ps2qw_ingame)
 		{
-			M_Menu_Main_f ();
+			if (cls.state == ca_active)
+			{
+				PS2QW_InGameMenuOpen();
+			}
+			else
+			{
+				M_Menu_Main_f();
+			}
+
 			return;
 		}
 
 		IN_Activate();
 		key_dest = key_game;
 		m_state = m_none;
+
 		return;
 	}
 	if (key_dest == key_console)
@@ -234,10 +244,12 @@ void M_ToggleMenu_f (void)
 	}
 	else
 	{
-		M_Menu_Main_f ();
+		if (cls.state == ca_active)
+			PS2QW_InGameMenuOpen ();
+		else
+			M_Menu_Main_f ();
 	}
 }
-
 
 //=============================================================================
 /* MAIN MENU */
@@ -1344,9 +1356,11 @@ void M_Options_Key (int k)
 		// [PS2_QUAKE]: keep the settings now. QuakeSpasm only writes config.cfg on quit, and a
 		// console is usually just switched off; an unchanged config doesn't touch the memory card.
 		Host_WriteConfiguration ();
-		M_Menu_Main_f ();
+		if (cls.state == ca_active)
+			PS2QW_InGameMenuOpen ();
+		else
+			M_Menu_Main_f ();
 		break;
-
 	case K_ENTER:
 	case K_KP_ENTER:
 	case K_ABUTTON:
@@ -2426,6 +2440,10 @@ void M_Draw (void)
 	case m_ps2about: // [PS2_QUAKE]
 		PS2_AboutMenuDraw ();
 		break;
+
+	case m_ps2qw_ingame:
+		PS2QW_InGameMenuDraw ();
+		break;
 	}
 
 	if (m_entersound)
@@ -2515,6 +2533,10 @@ void M_Keydown (int key)
 
 	case m_ps2about: // [PS2_QUAKE]
 		PS2_AboutMenuKey (key);
+		return;
+
+	case m_ps2qw_ingame:
+		PS2QW_InGameMenuKey (key);
 		return;
 	}
 }

@@ -19,6 +19,7 @@
 #include "ps2/renderer/gamma.h"
 #include "ps2/renderer/render_system.h"
 #include "ps2/renderer/cmd_buffer.h"
+#include "ps2/renderer/overscan.h"
 #include "ps2/renderer/texture.h"
 #include "ps2/renderer/texmgr.h"
 #include "ps2/renderer/loading_screen.h"
@@ -55,6 +56,8 @@ extern "C" {
 // where it uses it, too.
 extern "C" {
 extern cvar_t crosshair;
+cvar_t scr_overscan_x = ps2::MakeCvar("scr_overscan_x", "0", CVAR_ARCHIVE);
+cvar_t scr_overscan_y = ps2::MakeCvar("scr_overscan_y", "0", CVAR_ARCHIVE);
 }
 
 namespace {
@@ -145,6 +148,29 @@ constexpr const char * kOffOn[]           = { "0", "1" };
 constexpr const char * kMipFilters[]      = { "nearest", "bilinear", "trilinear" };
 constexpr const char * kDlightModeNames[] = { "lightmaps", "vertex", "glows" };
 constexpr const char * kParticleNames[]   = { "round", "square" };
+constexpr float        kOverscanFloats[] = { 0.0f, 0.01f, 0.02f, 0.03f, 0.04f, 0.05f, 0.06f, 0.07f, 0.08f, 0.09f, 0.10f };
+constexpr const char * kOverscanNames[]  = { "off", "1%", "2%", "3%", "4%", "5%", "6%", "7%", "8%", "9%", "10%" };
+static_assert(ps2::ArrayLength(kOverscanFloats) == ps2::ArrayLength(kOverscanNames));
+
+int OverscanIndexFor(const cvar_t & cvar)
+{
+    int best = 0;
+    for (int i = 1; i < ps2::ArrayLength(kOverscanFloats); ++i)
+    {
+        if (ps2::math::Fabsf(kOverscanFloats[i] - cvar.value) <
+            ps2::math::Fabsf(kOverscanFloats[best] - cvar.value))
+        {
+            best = i;
+        }
+    }
+    return best;
+}
+
+int  OverscanXIndex()              { return OverscanIndexFor(scr_overscan_x); }
+void SetOverscanXIndex(const int i) { Cvar_SetValue(scr_overscan_x.name, kOverscanFloats[i]); }
+int  OverscanYIndex()              { return OverscanIndexFor(scr_overscan_y); }
+void SetOverscanYIndex(const int i) { Cvar_SetValue(scr_overscan_y.name, kOverscanFloats[i]); }
+
 
 // The dynamic lights row spans two cvars: gl_flashblend's glows stand in for the walls' lighting
 // whichever way ps2_dynamic_lights says they take it, so picking the glows sets the one and leaves
@@ -220,20 +246,22 @@ void SetCrosshairScaleIndex(const int index)
 }
 
 const VideoRow kVideoRows[] = {
-    { "Video mode",     "auto is the console's own; on restart",   &s_videoMode,                         kVideoModes, kVideoModeNames,  3,                     nullptr,            nullptr,               false },
-    { "Color depth",    "16-bit leaves more VRAM; on restart",     &s_fb16Bit,                           kFbFormats,  kFbFormatNames,   2,                     nullptr,            nullptr,               false },
-    { "Screen X",       "the picture left or right on the TV",     &s_screenX,                           nullptr,     nullptr,          (2 * kMaxScreenX) + 1, nullptr,            nullptr,               true  },
-    { "Screen Y",       "the picture up or down on the TV",        &s_screenY,                           nullptr,     nullptr,          (2 * kMaxScreenY) + 1, nullptr,            nullptr,               true  },
-    { "Texture filter", "trilinear blends mip levels too",         &ps2::view::MipFilterCvar(),          kMipFilters, kMipFilters,      3,                     nullptr,            nullptr,               false },
-    { "Dithering",      "hides 16-bit color banding",              &s_enableDither,                      kOffOn,      nullptr,          2,                     nullptr,            nullptr,               false },
-    { "Dynamic lights", "vertex: on VU1, no lightmap rebuilds",    nullptr,                              nullptr,     kDlightModeNames, 3,                     DynamicLightsIndex, SetDynamicLightsIndex, false },
-    { "Model shadows",  "a shadow on the ground under each model", &r_shadows,                           kOffOn,      nullptr,          2,                     nullptr,            nullptr,               false },
-    { "Particles",      "square: as software Quake drew them",     nullptr,                              nullptr,     kParticleNames,   2,                     ParticlesIndex,     SetParticlesIndex,     false },
-    { "Crosshair",      "Quake II's: a cross, a dot or an angle",  nullptr,                              nullptr,     kCrosshairNames,  4,                     CrosshairIndex,     SetCrosshairIndex,     false },
-    { "Crosshair size", "bigger, for a TV across the room",        nullptr,                              nullptr,     kCrosshairScaleNames, 5,                 CrosshairScaleIndex, SetCrosshairScaleIndex, false },
-    { "GS latency",     "a frame ahead: faster, one frame of lag", &s_gsLatency,                         kOffOn,      nullptr,          2,                     nullptr,            nullptr,               false },
-    { "Show FPS",       "frames per second, at the top right",     &ps2::overlay::FpsCounterCvar(),      kOffOn,      nullptr,          2,                     nullptr,            nullptr,               false },
-    { "Debug overlays", "memory, VRAM and profiling panels",       &ps2::overlay::DebugOverlaysCvar(),   kOffOn,      nullptr,          2,                     nullptr,            nullptr,               false },
+    { "Video mode",     "auto is the console's own; on restart",   &s_videoMode,                         kVideoModes, kVideoModeNames,  3,                                nullptr,             nullptr,                 false },
+    { "Color depth",    "16-bit leaves more VRAM; on restart",     &s_fb16Bit,                           kFbFormats,  kFbFormatNames,   2,                                nullptr,             nullptr,                 false },
+    { "Screen X",       "the picture left or right on the TV",     &s_screenX,                           nullptr,     nullptr,          (2 * kMaxScreenX) + 1,            nullptr,             nullptr,                 true  },
+    { "Screen Y",       "the picture up or down on the TV",        &s_screenY,                           nullptr,     nullptr,          (2 * kMaxScreenY) + 1,            nullptr,             nullptr,                 true  },
+    { "Overscan X",     "horizontal safe-zone inset",              &scr_overscan_x,                      nullptr,     kOverscanNames,   ps2::ArrayLength(kOverscanNames), OverscanXIndex,      SetOverscanXIndex,       false },
+    { "Overscan Y",     "vertical safe-zone inset",                &scr_overscan_y,                      nullptr,     kOverscanNames,   ps2::ArrayLength(kOverscanNames), OverscanYIndex,      SetOverscanYIndex,       false },
+    { "Texture filter", "trilinear blends mip levels too",         &ps2::view::MipFilterCvar(),          kMipFilters, kMipFilters,      3,                                nullptr,             nullptr,                 false },
+    { "Dithering",      "hides 16-bit color banding",              &s_enableDither,                      kOffOn,      nullptr,          2,                                nullptr,             nullptr,                 false },
+    { "Dynamic lights", "vertex: on VU1, no lightmap rebuilds",    nullptr,                              nullptr,     kDlightModeNames, 3,                                DynamicLightsIndex,  SetDynamicLightsIndex,   false },
+    { "Model shadows",  "a shadow on the ground under each model", &r_shadows,                           kOffOn,      nullptr,          2,                                nullptr,             nullptr,                 false },
+    { "Particles",      "square: as software Quake drew them",     nullptr,                              nullptr,     kParticleNames,   2,                                ParticlesIndex,      SetParticlesIndex,       false },
+    { "Crosshair",      "Quake II's: a cross, a dot or an angle",  nullptr,                              nullptr,     kCrosshairNames,  4,                                CrosshairIndex,      SetCrosshairIndex,       false },
+    { "Crosshair size", "bigger, for a TV across the room",        nullptr,                              nullptr,     kCrosshairScaleNames, 5,                            CrosshairScaleIndex, SetCrosshairScaleIndex,  false },
+    { "GS latency",     "a frame ahead: faster, one frame of lag", &s_gsLatency,                         kOffOn,      nullptr,          2,                                nullptr,             nullptr,                 false },
+    { "Show FPS",       "frames per second, at the top right",     &ps2::overlay::FpsCounterCvar(),      kOffOn,      nullptr,          2,                                nullptr,             nullptr,                 false },
+    { "Debug overlays", "memory, VRAM and profiling panels",       &ps2::overlay::DebugOverlaysCvar(),   kOffOn,      nullptr,          2,                                nullptr,             nullptr,                 false },
 };
 
 constexpr int kNumVideoRows = ps2::ArrayLength(kVideoRows);
@@ -289,10 +317,14 @@ void VideoMenuOpen()
 void DrawScreenEdge()
 {
     constexpr int kLine = 2;
-    ps2::rs::FillRect(0, 0, glwidth, kLine, 255, 255, 255, 255);
-    ps2::rs::FillRect(0, glheight - kLine, glwidth, kLine, 255, 255, 255, 255);
-    ps2::rs::FillRect(0, 0, kLine, glheight, 255, 255, 255, 255);
-    ps2::rs::FillRect(glwidth - kLine, 0, kLine, glheight, 255, 255, 255, 255);
+    int ix = 0;
+    int iy = 0;
+    ps2::rs::GetOverscanInset(glwidth, glheight, ix, iy);
+
+    ps2::rs::FillRect(ix, iy, glwidth - (2 * ix), kLine, 255, 255, 255, 255);
+    ps2::rs::FillRect(ix, glheight - iy - kLine, glwidth - (2 * ix), kLine, 255, 255, 255, 255);
+    ps2::rs::FillRect(ix, iy, kLine, glheight - (2 * iy), 255, 255, 255, 255);
+    ps2::rs::FillRect(glwidth - ix - kLine, iy, kLine, glheight - (2 * iy), 255, 255, 255, 255);
 }
 
 void VideoMenuDraw()
@@ -337,7 +369,8 @@ void VideoMenuDraw()
 
     M_DrawCharacter(200, kRowsY + (kRowHeight * s_videoCursor), 12 + (static_cast<int>(realtime * 4.0) & 1));
 
-    if (kVideoRows[s_videoCursor].number)
+    const VideoRow & selectedRow = kVideoRows[s_videoCursor];
+    if (selectedRow.number || selectedRow.cvar == &scr_overscan_x || selectedRow.cvar == &scr_overscan_y)
     {
         DrawScreenEdge();
     }
@@ -468,6 +501,8 @@ void VID_Init()
     Cvar_RegisterVariable(&s_videoMode);
     Cvar_RegisterVariable(&s_screenX);
     Cvar_RegisterVariable(&s_screenY);
+    Cvar_RegisterVariable(&scr_overscan_x);
+    Cvar_RegisterVariable(&scr_overscan_y);
     Cvar_SetCallback(&s_screenX, ScreenOffsetChanged);
     Cvar_SetCallback(&s_screenY, ScreenOffsetChanged);
 

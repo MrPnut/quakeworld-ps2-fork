@@ -213,7 +213,9 @@ ENGINE_C_SRC = \
 	quake/gl_rlight.c \
 	quake/gl_screen.c \
 	quake/gl_fog.c \
-	quake/r_part.c
+	quake/r_part.c \
+	ps2_qw/mod_menu.c \
+	ps2_qw/ingame_menu.c
 
 # The disc builds' game data device: a read-only ISO9660 file system over the CD/DVD drive.
 ifeq ($(ISO_BUILD),1)
@@ -369,7 +371,7 @@ ifeq ($(RELEASE_FLAGS),1)
 else
     EE_OPTFLAGS     = -O2
     EE_DBGINFOFLAGS = -gdwarf-2 -gz
-    CONFIG_DEFS     = -DPS2_QUAKE_DEBUG=1 -DPS2_QUAKE_ASSERTS=1 -DPS2_QUAKE_PROFILE=1
+    CONFIG_DEFS     = -DPS2_QUAKE_DEBUG=1 -DPS2_QUAKE_ASSERTS=1 -DPS2_QUAKE_PROFILE=0
 endif
 
 COMMON_DEFS = -DPS2_QUAKE $(CONFIG_DEFS) -DPS2_QUAKE_ISO=$(ISO_BUILD)

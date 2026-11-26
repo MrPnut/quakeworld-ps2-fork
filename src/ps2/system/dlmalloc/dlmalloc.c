@@ -20,7 +20,7 @@
 /* Never hand memory back to the system with a negative sbrk (ps2sdk's sbrk only
  * grows); dlmalloc keeps freed blocks in its own free lists instead. */
 #define MORECORE_CANNOT_TRIM 1
-#define USE_LOCKS 0
+#define USE_MALLOC_LOCK 1
 
 /* Pin the page size. dlmalloc's default malloc_getpagesize expands to
  * sysconf(_SC_PAGE_SIZE), but ps2sdk's sysconf() is a stub that always returns

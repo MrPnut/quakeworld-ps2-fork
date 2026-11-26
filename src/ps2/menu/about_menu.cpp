@@ -28,17 +28,21 @@ struct Line
 // QUAKESPASM_VERSION is the port's own version (quakedef.h); 0.97.0 is the QuakeSpasm it started
 // from.
 constexpr Line kLines[] = {
-    { "Quake for the PlayStation 2",    true  },
-    { "Version " QUAKESPASM_VER_STRING, false },
-    { "",                               false },
-    { "An unofficial, fan-made port",   false },
-    { "of id Software's Quake, built",  false },
-    { "on QuakeSpasm 0.97.0 with",      false },
-    { "the free PS2DEV SDK.",           false },
-    { "",                               false },
-    { "PS2 port by Guilherme Lampert",  false },
-    { "",                               false },
-    { "github.com/glampert/quake-ps2",  true  },
+    { "QuakeWorld for the PlayStation 2",       true  },
+    { "Version " QUAKESPASM_VER_STRING,         false },
+    { "",                                       false },
+    { "An unofficial, fan-made port",           false },
+    { "of id Software's QuakeWorld, based",     false },
+    { "on Guilherme Lampert's port",            false },
+    { "of the Quake engine / game",             false },
+    { "for the Playstation 2",                  false },
+    { "",                                       false },
+    { "Quake PS2 port by Guilherme Lampert",    false },
+    { "",                                       false },
+    { "github.com/glampert/quake-ps2",          true  },
+    { "",                                       false },
+    { "QuakeWorld port by Nick Cavallo",        false },
+    { "github.com/MrPnut/quakeworld-ps2",       true  }
 };
 
 constexpr int kNumLines = ps2::ArrayLength(kLines);

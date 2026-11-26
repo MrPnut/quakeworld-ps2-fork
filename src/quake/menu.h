@@ -42,7 +42,8 @@ enum m_state_e {
 	m_search,
 	m_slist,
 	m_ps2debug, // [PS2_QUAKE]: Options' "Debug Options" page, drawn by the backend (engine_hooks.h)
-	m_ps2about // [PS2_QUAKE]: the main menu's "About" page, drawn by the backend (engine_hooks.h)
+	m_ps2about, // [PS2_QUAKE]: the main menu's "About" page, drawn by the backend (engine_hooks.h)
+	m_ps2qw_ingame
 };
 
 extern enum m_state_e m_state;

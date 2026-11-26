@@ -21,6 +21,7 @@
 #include "ps2/builtin/builtin.h"
 #include "ps2/renderer/draw.h"
 #include "ps2/renderer/gamma.h"
+#include "ps2/renderer/overscan.h"
 #include "ps2/renderer/render_system.h"
 #include "ps2/renderer/scrap_atlas.h"
 #include "ps2/renderer/texmgr.h"
@@ -36,6 +37,8 @@ extern "C" {
 // gl_screen.c's 3D view rectangle, which the crosshair canvas centres on. No header has it:
 // gl_draw.c declared it where it used it, too.
 extern vrect_t scr_vrect;
+extern cvar_t  scr_overscan_x;
+extern cvar_t  scr_overscan_y;
 }
 
 namespace {
@@ -663,12 +666,21 @@ void Draw_ConsoleBackground()
 
     const float alpha = con_forcedup ? 1.0f : s_conAlpha.value;
 
-    GL_SetCanvas(CANVAS_CONSOLE); // in case this is called from weird places
-
     if (alpha > 0.0f)
     {
+        int ix = 0, iy = 0;
+        ps2::rs::GetOverscanInset(glwidth, glheight, ix, iy);
+        const float conHeight = static_cast<float>(vid.conheight);
+        const float slide     = std::clamp(scr_con_current / static_cast<float>(glheight), 0.0f, 1.0f);
+        const int   lines     = static_cast<int>(conHeight * (1.0f - slide));
+
+        SetCanvasTransform(0.0f, static_cast<float>(vid.conwidth), conHeight + static_cast<float>(lines),
+                           static_cast<float>(lines), glx, gly, glwidth, glheight);
+
         DrawPic(0, 0, pic, AlphaByte(alpha));
     }
+
+    GL_SetCanvas(CANVAS_CONSOLE);
 }
 
 // Repeats the 64x64 border tile over a rectangle, texels addressed in screen space: the tile
@@ -699,36 +711,40 @@ void Draw_FadeScreen()
 {
     PS2_PROFILE_SCOPED_EVENT(ps2::prof_evt::Ui);
 
-    GL_SetCanvas(CANVAS_DEFAULT);
-    FillRect(0.0f, 0.0f, static_cast<float>(glwidth), static_cast<float>(glheight), 0, 0, 0, AlphaByte(0.5f));
+    ps2::rs::FillRect(0, 0, glwidth, glheight, 0, 0, 0, AlphaByte(0.5f));
 
     Sbar_Changed();
 }
 
 void GL_SetCanvas(canvastype newcanvas)
 {
-    if (newcanvas == s_currentCanvas)
-    {
-        return;
-    }
     s_currentCanvas = newcanvas;
 
-    const float width  = static_cast<float>(glwidth);
-    const float height = static_cast<float>(glheight);
+    int ix = 0;
+    int iy = 0;
+    ps2::rs::GetOverscanInset(glwidth, glheight, ix, iy);
+
+    const int   safeX      = glx + ix;
+    const int   safeY      = gly + iy;
+    const int   safeW      = glwidth - (2 * ix);
+    const int   safeH      = glheight - (2 * iy);
+    const float width      = static_cast<float>(safeW);
+    const float height     = static_cast<float>(safeH);
     float s = 1.0f;
 
     switch (newcanvas)
     {
     case CANVAS_DEFAULT:
-        SetCanvasTransform(0.0f, width, height, 0.0f, glx, gly, glwidth, glheight);
+        SetCanvasTransform(0.0f, width, height, 0.0f, safeX, safeY, safeW, safeH);
         break;
 
     case CANVAS_CONSOLE:
     {
         const float conHeight = static_cast<float>(vid.conheight);
-        const int   lines     = static_cast<int>(conHeight - (scr_con_current * conHeight / height));
+        const float slide     = std::clamp(scr_con_current / static_cast<float>(glheight), 0.0f, 1.0f);
+        const int   lines     = static_cast<int>(conHeight * (1.0f - slide));
         SetCanvasTransform(0.0f, static_cast<float>(vid.conwidth), conHeight + static_cast<float>(lines),
-                           static_cast<float>(lines), glx, gly, glwidth, glheight);
+                           static_cast<float>(lines), safeX, safeY, safeW, safeH);
         break;
     }
 
@@ -737,23 +753,14 @@ void GL_SetCanvas(canvastype newcanvas)
         s = Clamp(1.0f, scr_menuscale.value, s);
         // ericw -- doubled width to 640 to accommodate long keybindings
         SetCanvasTransform(0.0f, 640.0f, 200.0f, 0.0f,
-                           ViewportInt(static_cast<float>(glx) + ((width - (320.0f * s)) / 2.0f)),
-                           ViewportInt(static_cast<float>(gly) + ((height - (200.0f * s)) / 2.0f)),
+                           ViewportInt(static_cast<float>(safeX) + ((width - (320.0f * s)) / 2.0f)),
+                           ViewportInt(static_cast<float>(safeY) + ((height - (200.0f * s)) / 2.0f)),
                            ViewportInt(640.0f * s), ViewportInt(200.0f * s));
         break;
 
     case CANVAS_SBAR:
         s = Clamp(1.0f, scr_sbarscale.value, width / 320.0f);
-        //if (cl.deathmatch)
-        //{
-            SetCanvasTransform(0.0f, width / s, 48.0f, 0.0f, glx, gly, glwidth, ViewportInt(48.0f * s));
-        //}
-        //else mrp double check
-        //{
-        //    SetCanvasTransform(0.0f, 320.0f, 48.0f, 0.0f,
-        //                       ViewportInt(static_cast<float>(glx) + ((width - (320.0f * s)) / 2.0f)), gly,
-        //                       ViewportInt(320.0f * s), ViewportInt(48.0f * s));
-        //}
+        SetCanvasTransform(0.0f, width / s, 48.0f, 0.0f, safeX, safeY, safeW, ViewportInt(48.0f * s));
         break;
 
     case CANVAS_WARPIMAGE:
@@ -771,18 +778,19 @@ void GL_SetCanvas(canvastype newcanvas)
 
     case CANVAS_BOTTOMLEFT: // used by devstats
         s = width / static_cast<float>(vid.conwidth); // use console scale
-        SetCanvasTransform(0.0f, 320.0f, 200.0f, 0.0f, glx, gly, ViewportInt(320.0f * s), ViewportInt(200.0f * s));
+        SetCanvasTransform(0.0f, 320.0f, 200.0f, 0.0f, safeX, safeY, ViewportInt(320.0f * s), ViewportInt(200.0f * s));
         break;
 
     case CANVAS_BOTTOMRIGHT: // used by fps/clock
         s = width / static_cast<float>(vid.conwidth); // use console scale
-        SetCanvasTransform(0.0f, 320.0f, 200.0f, 0.0f, ViewportInt(static_cast<float>(glx) + width - (320.0f * s)), gly,
+        SetCanvasTransform(0.0f, 320.0f, 200.0f, 0.0f, ViewportInt(static_cast<float>(safeX) + width - (320.0f * s)), safeY,
                            ViewportInt(320.0f * s), ViewportInt(200.0f * s));
         break;
 
     case CANVAS_TOPRIGHT: // used by disc
-        SetCanvasTransform(0.0f, 320.0f, 200.0f, 0.0f, ViewportInt(static_cast<float>(glx) + width - (320.0f * s)),
-                           ViewportInt(static_cast<float>(gly) + height - (200.0f * s)),
+        s = width / static_cast<float>(vid.conwidth);
+        SetCanvasTransform(0.0f, 320.0f, 200.0f, 0.0f, ViewportInt(static_cast<float>(safeX) + width - (320.0f * s)),
+                           ViewportInt(static_cast<float>(safeY) + height - (200.0f * s)),
                            ViewportInt(320.0f * s), ViewportInt(200.0f * s));
         break;
 

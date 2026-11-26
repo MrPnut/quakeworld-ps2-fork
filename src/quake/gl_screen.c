@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "ps2/engine_hooks.h" // [PS2_QUAKE]
+#include "ps2_qw/mod_menu.h"
 
 /*
 
@@ -150,6 +151,7 @@ for a few moments
 */
 void SCR_CenterPrint (const char *str) //update centerprint data
 {
+	str = PS2QW_FilterCenterPrint(str);
 //	strncpy (scr_centerstring, str, sizeof(scr_centerstring)-1);
 	COM_WordWrap(scr_centerstring, str, sizeof(scr_centerstring), scr_usekfont.value ? 40 : 0);
 	scr_centertime_off = scr_centertime.value;
@@ -223,6 +225,13 @@ void SCR_CheckDrawCenterString (void)
 		scr_erase_lines = scr_center_lines;
 
 	scr_centertime_off -= host_frametime;
+
+	if (scr_centertime_off <= 0 && !cl.intermission)
+	{
+		PS2QW_ClearModMenu();
+
+		return;
+	}
 
 	if (scr_centertime_off <= 0 && !cl.intermission)
 		return;

@@ -121,7 +121,9 @@ static int    s_cutShort      = 0;     // perf pass: levels left before their to
 
 // A perf pass's capture runs from its first map to its last, and a "ps2_testmaps_restart" in
 // between starts the maps over in the same one. Set back when the pass ends it.
-static bool   s_captureStarted = false;
+#if PS2_QUAKE_PROFILE
+    static bool   s_captureStarted = false;
+#endif
 
 void Restart()
 {

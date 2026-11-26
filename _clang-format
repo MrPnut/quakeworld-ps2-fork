@@ -25,7 +25,6 @@ ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth:              4
 DerivePointerAlignment:                         false
 ExperimentalAutoDetectBinPacking:               false
-IndentCaseLabels:                               false
 IndentWrappedFunctionNames:                     false
 IndentFunctionDeclarationAfterType:             false
 MaxEmptyLinesToKeep:                            1
@@ -61,5 +60,7 @@ CommentPragmas:                                 '^ IWYU pragma:'
 ForEachMacros:                                  [ foreach, Q_FOREACH, BOOST_FOREACH ]
 SpaceBeforeParens:                              ControlStatements
 DisableFormat:                                  false
+InsertBraces:                                   true
+IndentCaseLabels:                               true
 ...
 

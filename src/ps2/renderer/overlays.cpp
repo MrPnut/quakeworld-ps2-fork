@@ -14,9 +14,11 @@
 #include "ps2/renderer/draw.h"
 #include "ps2/renderer/gs.h"
 #include "ps2/renderer/render_system.h"
+#include "ps2/renderer/overscan.h"
 #include "ps2/renderer/cmd_buffer.h"
 #include "ps2/renderer/vram.h"
 #include "ps2/renderer/profile.h"
+#include "ps2/renderer/overscan.h"
 #include "ps2/system/heap.h"
 
 #include <algorithm>
@@ -37,12 +39,12 @@ constexpr u8 kRed[3]    = { 128, 0,   0   };
 // The FPS counter and the panels' master switch, the two the Video Options page toggles, are off in
 // release builds. Each panel's own switch is on in every build, so the master switch alone brings
 // the panels up.
-static cvar_t s_showDebugOverlays = ps2::MakeCvar("ps2_debug_overlays", PS2_QUAKE_DEBUG ? "1" : "0", CVAR_ARCHIVE); // all but the FPS counter
-static cvar_t s_showFpsCount      = ps2::MakeCvar("ps2_show_fps",       PS2_QUAKE_DEBUG ? "1" : "0", CVAR_ARCHIVE);
-static cvar_t s_showMemStats      = ps2::MakeCvar("ps2_show_memstats",  "1", CVAR_ARCHIVE);
-static cvar_t s_showVramStats     = ps2::MakeCvar("ps2_show_vramstats", "1", CVAR_ARCHIVE);
-static cvar_t s_showDrawStats     = ps2::MakeCvar("ps2_show_drawstats", "1", CVAR_ARCHIVE);
-static cvar_t s_showProfileStats  = ps2::MakeCvar("ps2_show_profile",   "1", CVAR_ARCHIVE);
+static cvar_t s_showDebugOverlays = ps2::MakeCvar("ps2_debug_overlays", "0", CVAR_ARCHIVE); // all but the FPS counter
+static cvar_t s_showFpsCount      = ps2::MakeCvar("ps2_show_fps",       "0", CVAR_ARCHIVE);
+static cvar_t s_showMemStats      = ps2::MakeCvar("ps2_show_memstats",  "0", CVAR_ARCHIVE);
+static cvar_t s_showVramStats     = ps2::MakeCvar("ps2_show_vramstats", "0", CVAR_ARCHIVE);
+static cvar_t s_showDrawStats     = ps2::MakeCvar("ps2_show_drawstats", "0", CVAR_ARCHIVE);
+static cvar_t s_showProfileStats  = ps2::MakeCvar("ps2_show_profile",   "0", CVAR_ARCHIVE);
 
 // One 8x8 glyph, at a screen position.
 void DrawGlyph(const int x, const int y, int c, const u8 color[3])
@@ -143,8 +145,10 @@ void DrawFpsCounter()
         color = s_fps.color;
     }
 
-    DrawPanel(ps2::gs::Width() - 68, 2, 64, 12);
-    DrawText(ps2::gs::Width() - 64, 4, text, color);
+    int ix = 0, iy = 0;
+    ps2::rs::GetOverscanInset(ps2::gs::Width(), ps2::gs::Height(), ix, iy);
+    DrawPanel(ps2::gs::Width() - 68 - ix, 2 + iy, 64, 12);
+    DrawText(ps2::gs::Width() - 64 - ix, 4 + iy, text, color);
 }
 
 // Per-event frame time panel, stacked under the FPS counter in the top-right corner: one line per
@@ -192,8 +196,11 @@ void DrawProfileOverlay()
     constexpr int kPadding    = 4;
 
     const int panelHeight = ((numRows + 1) * kLineHeight) + (kPadding * 2); // header + one per event
-    const int panelX      = ps2::gs::Width() - kPanelWidth; // right edge aligned with the FPS counter
-    const int panelY      = 16;                             // clears the 12px FPS box at y = 2
+
+    int ix = 0, iy = 0;
+    ps2::rs::GetOverscanInset(ps2::gs::Width(), ps2::gs::Height(), ix, iy);
+    const int panelX = ps2::gs::Width() - kPanelWidth - ix;
+    const int panelY = 16 + iy;
 
     DrawPanel(panelX, panelY, kPanelWidth, panelHeight);
 
@@ -238,8 +245,11 @@ void DrawMemUsageOverlay()
     constexpr int kPadding    = 4;
 
     const int panelHeight = (kNumLines * kLineHeight) + (kPadding * 2);
-    const int panelX      = ps2::gs::Width() - kPanelWidth;
-    const int panelY      = ps2::gs::Height() - panelHeight;
+
+    int ix = 0, iy = 0;
+    ps2::rs::GetOverscanInset(ps2::gs::Width(), ps2::gs::Height(), ix, iy);
+    const int panelX = ps2::gs::Width() - kPanelWidth - ix;
+    const int panelY = ps2::gs::Height() - panelHeight - iy;
 
     DrawPanel(panelX, panelY, kPanelWidth, panelHeight);
 
@@ -299,8 +309,11 @@ void DrawVramUsageOverlay()
     const ps2::vram::Stats stats = ps2::vram::GetStats();
 
     const int panelHeight = (kNumLines * kLineHeight) + (kPadding * 2);
-    const int panelX      = 0;
-    const int panelY      = ps2::gs::Height() - panelHeight;
+
+    int ix = 0, iy = 0;
+    ps2::rs::GetOverscanInset(ps2::gs::Width(), ps2::gs::Height(), ix, iy);
+    const int panelX = ix;
+    const int panelY = ps2::gs::Height() - panelHeight - iy;
 
     DrawPanel(panelX, panelY, kPanelWidth, panelHeight);
 
@@ -377,10 +390,12 @@ void DrawDrawStatsOverlay()
     constexpr int kNumLines   = ps2::ArrayLength(rows) + 1; // header + one per counter
 
     const int panelHeight = (kNumLines * kLineHeight) + (kPadding * 2);
-    DrawPanel(0, 0, kPanelWidth, panelHeight);
 
-    const int textX = kPadding;
-    int textY = kPadding;
+    int ix = 0, iy = 0;
+    ps2::rs::GetOverscanInset(ps2::gs::Width(), ps2::gs::Height(), ix, iy);
+    DrawPanel(ix, iy, kPanelWidth, panelHeight);
+    const int textX = ix + kPadding;
+    int textY = iy + kPadding;
 
     DrawText(textX, textY, "DRAW STATS");
     textY += kLineHeight;

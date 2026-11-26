@@ -1544,12 +1544,42 @@ static int mALLOC_MUTEx;
 
 #else
 
-#include <pthread.h>
+#include <kernel.h>
 
-static pthread_mutex_t mALLOC_MUTEx = PTHREAD_MUTEX_INITIALIZER;
+static int mALLOC_SEMa = -1;
 
-#define MALLOC_PREACTION pthread_mutex_lock(&mALLOC_MUTEx)
-#define MALLOC_POSTACTION pthread_mutex_unlock(&mALLOC_MUTEx)
+static int ps2_malloc_lock(void)
+{
+    int sema = mALLOC_SEMa;
+    if (sema < 0)
+    {
+        ee_sema_t desc;
+        desc.init_count = 1;
+        desc.max_count  = 1;
+        desc.option     = 0;
+        sema = CreateSema(&desc);
+        if (sema < 0)
+        {
+            return -1;
+        }
+        mALLOC_SEMa = sema;
+    }
+    WaitSema(sema);
+    return 0;
+}
+
+static int ps2_malloc_unlock(void)
+{
+    const int sema = mALLOC_SEMa;
+    if (sema >= 0)
+    {
+        SignalSema(sema);
+    }
+    return 0;
+}
+
+#define MALLOC_PREACTION  ps2_malloc_lock()
+#define MALLOC_POSTACTION ps2_malloc_unlock()
 
 #endif /* USE_MALLOC_LOCK */
 
