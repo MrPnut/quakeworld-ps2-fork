@@ -38,7 +38,7 @@ extern cvar_t gl_fullbrights;
 
 // The player skins in their colours (alias.cpp). One the cache evicts the player model under goes
 // with the model, and its slot is cleared here, or the next draw would use it freed.
-extern gltexture_t * playertextures[MAX_SCOREBOARD];
+extern gltexture_t * playertextures[MAX_CLIENTS];
 } // extern "C"
 
 namespace {

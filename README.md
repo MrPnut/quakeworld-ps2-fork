@@ -21,8 +21,7 @@ The eventual goal is to be able to play the best QW mods (MegaTF, CA) on my PS2,
 1. No listen server yet, so you need to connect to an external QW server for the time being.
 2. No server browser yet, so you have to to connect to a server using autoexec.cfg or console
 3. Timing issue connecting to servers with dhcp enabled.  This has only occurred twice during my testing where "connecting x.x.x.x" will just spam until you reconnect.  It probably because when I test, I connect to a server automatically in autoexec.cfg.  If this happens to you, just use static ip config for now.
-4. Everyone's shirt/pants color is the same in CA
-5. Keyboard / mouse support hasn't been tested, it may work, but I want to focus on having a quality controller experience first
+4. Keyboard / mouse support hasn't been tested, it may work, but I want to focus on having a quality controller experience first
 
 ### Milestones
 

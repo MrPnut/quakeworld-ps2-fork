@@ -863,63 +863,12 @@ CL_NewTranslation
 static void
 CL_NewTranslation(int slot)
 {
-#ifdef GLQUAKE
     if (slot > MAX_CLIENTS)
-	Sys_Error("%s: slot > MAX_CLIENTS", __func__);
+    {
+        Sys_Error("%s: slot > MAX_CLIENTS", __func__);
+    }
 
     R_TranslatePlayerSkin(slot);
-#else
-    int i, j;
-    int top, bottom;
-    byte *dest, *source;
-    player_info_t *player;
-    const char *skin_key;
-    char skin[MAX_QPATH];
-
-    if (slot > MAX_CLIENTS)
-	Sys_Error("%s: slot > MAX_CLIENTS", __func__);
-
-    player = &cl.players[slot];
-
-    skin_key = Info_ValueForKey(player->userinfo, "skin");
-    COM_StripExtension(skin_key, skin, sizeof(skin));
-
-    if (player->skin && !strcasecmp(skin, player->skin->name))
-	player->skin = NULL;
-
-    if (player->_topcolor != player->topcolor ||
-	player->_bottomcolor != player->bottomcolor || !player->skin) {
-	player->_topcolor = player->topcolor;
-	player->_bottomcolor = player->bottomcolor;
-
-	dest = player->translations;
-	source = vid.colormap;
-	memcpy(dest, vid.colormap, sizeof(player->translations));
-	top = player->topcolor;
-	if (top > 13 || top < 0)
-	    top = 13;
-	top *= 16;
-	bottom = player->bottomcolor;
-	if (bottom > 13 || bottom < 0)
-	    bottom = 13;
-	bottom *= 16;
-
-	for (i = 0; i < VID_GRADES; i++, dest += 256, source += 256) {
-	    /* the artists made some backwards ranges.  sigh. */
-	    if (top < 128)
-		memcpy(dest + TOP_RANGE, source + top, 16);
-	    else
-		for (j = 0; j < 16; j++)
-		    dest[TOP_RANGE + j] = source[top + 15 - j];
-
-	    if (bottom < 128)
-		memcpy(dest + BOTTOM_RANGE, source + bottom, 16);
-	    else
-		for (j = 0; j < 16; j++)
-		    dest[BOTTOM_RANGE + j] = source[bottom + 15 - j];
-	}
-    }
-#endif
 }
 
 /*

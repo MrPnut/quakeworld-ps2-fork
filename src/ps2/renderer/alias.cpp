@@ -61,7 +61,7 @@ cvar_t gl_nocolors          = ps2::MakeCvar("gl_nocolors",          "0", CVAR_NO
 
 // The players' skins in their shirt and pants colours, one per scoreboard slot. texmgr.cpp clears
 // an entry whose texture it frees.
-gltexture_t * playertextures[MAX_SCOREBOARD];
+gltexture_t * playertextures[MAX_CLIENTS];
 
 } // extern "C"
 
@@ -640,14 +640,19 @@ void DrawAliasModel(entity_t & e, const bool viewModel)
 
     const gltexture_t * skin = hdr.gltextures[skinnum][anim];
     const gltexture_t * glow = (gl_fullbrights.value != 0.0f) ? hdr.fbtextures[skinnum][anim] : nullptr;
-    if (e.colormap != vid.colormap && gl_nocolors.value == 0.0f && IsPlayerEntity(e))
+    if (gl_nocolors.value == 0.0f && e.scoreboard != nullptr)
     {
-        const gltexture_t * const colored = playertextures[&e - cl_player_entities];
-        if (colored != nullptr)
+        const int playernum = static_cast<int>(e.scoreboard - cl.players);
+        if (playernum >= 0 && playernum < MAX_CLIENTS)
         {
-            skin = colored;
+            const gltexture_t * const colored = playertextures[playernum];
+            if (colored != nullptr)
+            {
+                skin = colored;
+            }
         }
     }
+
     const tex::Texture & skinTexture = BindableTexture(skin);
 
     // The view weapon gets QuakeSpasm's cl_gun_fovscale: past 90 degrees of field of view, its y and
@@ -801,13 +806,12 @@ extern "C" {
 // Load-time hooks gl_model.c calls
 // ------------------------------------------------------------------------------------------------
 
+static void TranslatePlayerSkinFromModel(int playernum, qmodel_t * model, aliashdr_t * hdr);
+
 // Called by Mod_LoadAliasModel each time the model loads, its working arrays (stverts, triangles,
 // poseverts) still holding it: gl_mesh.c's, building what the draw reads.
 void GL_MakeAliasModelDisplayLists(qmodel_t * m, aliashdr_t * hdr)
 {
-    // The poses, each vertex in the file's order, where the draw gathers its pose words from: on the
-    // hunk, with the rest of the model, which moves into the cache when the load is done and is read
-    // in again after an eviction. QuakeSpasm's VBO path keeps them the same way, in 'vertexes'.
     const int poseBytes = hdr->numverts * static_cast<int>(sizeof(trivertx_t));
     byte * const poses = static_cast<byte *>(Hunk_Alloc(hdr->numposes * poseBytes));
     for (int i = 0; i < hdr->numposes; ++i)
@@ -817,10 +821,17 @@ void GL_MakeAliasModelDisplayLists(qmodel_t * m, aliashdr_t * hdr)
     hdr->vertexes  = static_cast<intptr_t>(poses - static_cast<byte *>(static_cast<void *>(hdr)));
     hdr->poseverts = hdr->numverts;
 
-    // The corners only the first time: they are the same for every load of the same file.
     if (m->ps2_render == nullptr)
     {
         m->ps2_render = ps2::alias::BuildAliasDraw(*m, *hdr);
+    }
+
+    if (std::strcmp(m->name, "progs/player.mdl") == 0)
+    {
+        for (int i = 0; i < MAX_CLIENTS; ++i)
+        {
+            TranslatePlayerSkinFromModel(i, m, hdr);
+        }
     }
 }
 
@@ -849,48 +860,126 @@ void GLMesh_DeleteVertexBuffers()
 // Player skins (gl_rmisc.c's)
 // ------------------------------------------------------------------------------------------------
 
-// New colours for a player: their skin texture translated again.
-void R_TranslatePlayerSkin(int playernum)
+static void TranslatePlayerSkinFromModel(int playernum, qmodel_t * model, aliashdr_t * hdr)
 {
-    const int top    = cl.players[playernum].topcolor;
-    const int bottom = cl.players[playernum].bottomcolor;
-
-    if (gl_nocolors.value == 0.0f && playertextures[playernum] != nullptr)
-    {
-        TexMgr_ReloadImage(playertextures[playernum], top, bottom);
-    }
-}
-
-// A new skin or model for a player: their texture made again from the skin's indices, then
-// translated. Called when the skin or the model actually changes, not just the colours.
-void R_TranslateNewPlayerSkin(int playernum)
-{
-    entity_t & e = cl_player_entities[playernum];
-    if (e.model == nullptr || e.model->type != mod_alias)
+    if (playernum < 0 || playernum >= MAX_CLIENTS || model == nullptr || hdr == nullptr)
     {
         return;
     }
 
-    aliashdr_t * const hdr = static_cast<aliashdr_t *>(Mod_Extradata(e.model));
-
-    int skinnum = e.skinnum;
+    int skinnum = cl_player_entities[playernum].skinnum;
     if (skinnum < 0 || skinnum >= hdr->numskins)
     {
-        Con_DPrintf("(%d): Invalid player skin #%d\n", playernum, skinnum);
         skinnum = 0;
     }
 
-    // The 8-bit skin the model loader kept for this, in the model's cache block: read at once.
-    byte * const pixels = static_cast<byte *>(static_cast<void *>(hdr)) + hdr->texels[skinnum];
+    char playerName[64];
+    q_snprintf(playerName, sizeof(playerName), "player_%i", playernum);
+
+    byte * skinPixels = nullptr;
+    player_info_t & player = cl.players[playernum];
+    if (player.skin == nullptr)
+    {
+        Skin_Find(&player);
+    }
+    if (player.skin != nullptr)
+    {
+        skinPixels = Skin_Cache(player.skin);
+    }
+
+    if (skinPixels != nullptr)
+    {
+        playertextures[playernum] = TexMgr_LoadImage(model, playerName, 320, 200, SRC_INDEXED,
+                                                     skinPixels, "", 0, TEXPREF_PAD | TEXPREF_OVERWRITE);
+    }
+    else
+    {
+        byte * const pixels = static_cast<byte *>(static_cast<void *>(hdr)) + hdr->texels[skinnum];
+        playertextures[playernum] = TexMgr_LoadImage(model, playerName, hdr->skinwidth, hdr->skinheight, SRC_INDEXED,
+                                                     pixels, hdr->gltextures[skinnum][0]->source_file,
+                                                     hdr->gltextures[skinnum][0]->source_offset,
+                                                     TEXPREF_PAD | TEXPREF_OVERWRITE);
+    }
+
+    R_TranslatePlayerSkin(playernum);
+}
+
+void R_TranslateNewPlayerSkin(int playernum)
+{
+    qmodel_t * model = cl_player_entities[playernum].model;
+    if ((model == nullptr || model->type != mod_alias) && cl_playerindex > 0 && cl_playerindex < MAX_MODELS)
+    {
+        model = cl.model_precache[cl_playerindex];
+    }
+    if (model == nullptr || model->type != mod_alias)
+    {
+        return;
+    }
+
+    aliashdr_t * const hdr = static_cast<aliashdr_t *>(Mod_Extradata(model));
+    if (hdr == nullptr)
+    {
+        return;
+    }
+
+    int skinnum = cl_player_entities[playernum].skinnum;
+    if (skinnum < 0 || skinnum >= hdr->numskins)
+    {
+        skinnum = 0;
+    }
 
     char playerName[64];
     q_snprintf(playerName, sizeof(playerName), "player_%i", playernum);
-    playertextures[playernum] = TexMgr_LoadImage(e.model, playerName, hdr->skinwidth, hdr->skinheight, SRC_INDEXED,
-                                                 pixels, hdr->gltextures[skinnum][0]->source_file,
-                                                 hdr->gltextures[skinnum][0]->source_offset,
-                                                 TEXPREF_PAD | TEXPREF_OVERWRITE);
+
+    byte * skinPixels = nullptr;
+    player_info_t & player = cl.players[playernum];
+    if (player.skin == nullptr)
+    {
+        Skin_Find(&player);
+    }
+    if (player.skin != nullptr)
+    {
+        skinPixels = Skin_Cache(player.skin);
+    }
+
+    if (skinPixels != nullptr)
+    {
+        playertextures[playernum] = TexMgr_LoadImage(model, playerName, 320, 200, SRC_INDEXED,
+                                                     skinPixels, "", 0, TEXPREF_PAD | TEXPREF_OVERWRITE);
+    }
+    else
+    {
+        byte * const pixels = static_cast<byte *>(static_cast<void *>(hdr)) + hdr->texels[skinnum];
+        playertextures[playernum] = TexMgr_LoadImage(model, playerName, hdr->skinwidth, hdr->skinheight, SRC_INDEXED,
+                                                     pixels, hdr->gltextures[skinnum][0]->source_file,
+                                                     hdr->gltextures[skinnum][0]->source_offset,
+                                                     TEXPREF_PAD | TEXPREF_OVERWRITE);
+    }
 
     R_TranslatePlayerSkin(playernum);
+}
+
+void R_TranslatePlayerSkin(int playernum)
+{
+    if (playernum < 0 || playernum >= MAX_CLIENTS)
+    {
+        return;
+    }
+
+    if (gl_nocolors.value != 0.0f)
+    {
+        return;
+    }
+
+    if (playertextures[playernum] == nullptr)
+    {
+        R_TranslateNewPlayerSkin(playernum);
+        return;
+    }
+
+    const int top    = cl.players[playernum].topcolor;
+    const int bottom = cl.players[playernum].bottomcolor;
+    TexMgr_ReloadImage(playertextures[playernum], top, bottom);
 }
 
 } // extern "C"
